@@ -1,0 +1,585 @@
+/**
+ * suiteql-runner.css
+ * Tactacam NS Toolkit - SuiteQL Runner Styles
+ *
+ * Floating resizable panel for running SuiteQL queries and building
+ * saved searches with AI assistance.
+ *
+ * Scoped under .tacta-suiteql-runner to avoid collisions.
+ * Uses CSS custom properties from theme-vars.css (--tacta-*).
+ */
+
+/* ════════════════════════════════════════════════════════════════════
+   PANEL CONTAINER OVERRIDE
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner.tacta-panel {
+    width: 800px;
+    height: 500px;
+    max-width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MINIMIZED STATE
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner.tacta-sql-panel-minimized {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden;
+}
+
+.tacta-suiteql-runner.tacta-sql-panel-minimized .tacta-panel-body,
+.tacta-suiteql-runner.tacta-sql-panel-minimized .tacta-tabs,
+.tacta-suiteql-runner.tacta-sql-panel-minimized .tacta-panel-resize-handle {
+    display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MAXIMIZED STATE
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner.tacta-sql-panel-maximized {
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PANEL HEADER BUTTONS
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-header-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--tacta-radius-sm);
+    color: var(--tacta-text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background var(--tacta-transition-fast),
+                color var(--tacta-transition-fast);
+}
+
+.tacta-suiteql-runner .tacta-sql-header-btn:hover {
+    background: var(--tacta-bg-active);
+    color: var(--tacta-text);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TAB CONTENT AREA
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-panel-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.tacta-suiteql-runner .tacta-tab-content {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    padding: var(--tacta-space-md);
+}
+
+.tacta-suiteql-runner .tacta-tab-content.tacta-active {
+    display: flex;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   QUERY EDITOR
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-editor {
+    width: 100%;
+    min-height: 80px;
+    max-height: 200px;
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-family: var(--tacta-font-mono);
+    font-size: var(--tacta-font-size-sm);
+    line-height: 1.6;
+    color: var(--tacta-text);
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    resize: vertical;
+    outline: none;
+    tab-size: 4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    transition: border-color var(--tacta-transition-fast),
+                box-shadow var(--tacta-transition-fast);
+}
+
+.tacta-suiteql-runner .tacta-sql-editor:focus {
+    border-color: var(--tacta-accent);
+    box-shadow: 0 0 0 3px var(--tacta-accent-muted);
+}
+
+.tacta-suiteql-runner .tacta-sql-editor::placeholder {
+    color: var(--tacta-text-muted);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TOOLBAR (Run button, AI Assist toggle, status)
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    margin-top: var(--tacta-space-sm);
+    flex-wrap: wrap;
+}
+
+.tacta-suiteql-runner .tacta-sql-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+}
+
+.tacta-suiteql-runner .tacta-sql-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    margin-left: auto;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   STATUS BAR
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-status {
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-muted);
+    white-space: nowrap;
+}
+
+.tacta-suiteql-runner .tacta-sql-status--success {
+    color: var(--tacta-success);
+}
+
+.tacta-suiteql-runner .tacta-sql-status--error {
+    color: var(--tacta-error);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   HISTORY DROPDOWN
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-history-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.tacta-suiteql-runner .tacta-sql-history-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10;
+    min-width: 300px;
+    max-width: 500px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    box-shadow: var(--tacta-shadow-lg);
+    margin-top: var(--tacta-space-xs);
+    display: none;
+}
+
+.tacta-suiteql-runner .tacta-sql-history-dropdown.tacta-visible {
+    display: block;
+}
+
+.tacta-suiteql-runner .tacta-sql-history-item {
+    display: block;
+    width: 100%;
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-family: var(--tacta-font-mono);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--tacta-border);
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background var(--tacta-transition-fast);
+}
+
+.tacta-suiteql-runner .tacta-sql-history-item:last-child {
+    border-bottom: none;
+}
+
+.tacta-suiteql-runner .tacta-sql-history-item:hover {
+    background: var(--tacta-bg-hover);
+    color: var(--tacta-text);
+}
+
+.tacta-suiteql-runner .tacta-sql-history-empty {
+    padding: var(--tacta-space-md);
+    text-align: center;
+    color: var(--tacta-text-muted);
+    font-size: var(--tacta-font-size-xs);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   AI ASSIST SECTION
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-ai-section {
+    margin-top: var(--tacta-space-sm);
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    overflow: hidden;
+    transition: max-height var(--tacta-transition-normal);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-section.tacta-collapsed .tacta-sql-ai-body {
+    display: none;
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-header-title {
+    font-size: var(--tacta-font-size-sm);
+    font-weight: 600;
+    color: var(--tacta-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-xs);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-arrow {
+    font-size: 10px;
+    color: var(--tacta-text-muted);
+    transition: transform var(--tacta-transition-fast);
+    display: inline-block;
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-section:not(.tacta-collapsed) .tacta-sql-ai-arrow {
+    transform: rotate(90deg);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-body {
+    margin-top: var(--tacta-space-sm);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-input {
+    width: 100%;
+    min-height: 44px;
+    max-height: 100px;
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-family: var(--tacta-font-family);
+    font-size: var(--tacta-font-size-sm);
+    color: var(--tacta-text);
+    background: var(--tacta-bg);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    resize: vertical;
+    outline: none;
+    transition: border-color var(--tacta-transition-fast),
+                box-shadow var(--tacta-transition-fast);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-input:focus {
+    border-color: var(--tacta-accent);
+    box-shadow: 0 0 0 3px var(--tacta-accent-muted);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-input::placeholder {
+    color: var(--tacta-text-muted);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    margin-top: var(--tacta-space-sm);
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-explanation {
+    margin-top: var(--tacta-space-sm);
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-secondary);
+    background: var(--tacta-bg);
+    border-left: 3px solid var(--tacta-info);
+    border-radius: var(--tacta-radius-sm);
+    line-height: 1.5;
+}
+
+.tacta-suiteql-runner .tacta-sql-ai-nocfg {
+    margin-top: var(--tacta-space-sm);
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-warning);
+    background: var(--tacta-warning-bg);
+    border-radius: var(--tacta-radius-sm);
+    line-height: 1.5;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RESULTS TABLE
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-results {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--tacta-space-sm);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.tacta-suiteql-runner .tacta-sql-results .tacta-table-wrapper {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.tacta-suiteql-runner .tacta-sql-results .tacta-table td {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tacta-suiteql-runner .tacta-sql-results-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    margin-top: var(--tacta-space-sm);
+    flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   LOADING / EMPTY / ERROR STATES
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--tacta-space-sm);
+    padding: var(--tacta-space-xl);
+    color: var(--tacta-text-muted);
+    font-size: var(--tacta-font-size-sm);
+}
+
+.tacta-suiteql-runner .tacta-sql-empty {
+    text-align: center;
+    padding: var(--tacta-space-xl);
+    color: var(--tacta-text-muted);
+    font-size: var(--tacta-font-size-sm);
+}
+
+.tacta-suiteql-runner .tacta-sql-error {
+    padding: var(--tacta-space-md);
+    color: var(--tacta-error);
+    background: var(--tacta-error-bg);
+    border-radius: var(--tacta-radius-md);
+    font-size: var(--tacta-font-size-sm);
+    line-height: 1.5;
+    margin-top: var(--tacta-space-sm);
+    word-break: break-word;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SAVED SEARCH BUILDER
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-ss-builder {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.tacta-suiteql-runner .tacta-ss-prompt {
+    width: 100%;
+    min-height: 60px;
+    max-height: 120px;
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-family: var(--tacta-font-family);
+    font-size: var(--tacta-font-size-sm);
+    color: var(--tacta-text);
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    resize: vertical;
+    outline: none;
+    transition: border-color var(--tacta-transition-fast),
+                box-shadow var(--tacta-transition-fast);
+}
+
+.tacta-suiteql-runner .tacta-ss-prompt:focus {
+    border-color: var(--tacta-accent);
+    box-shadow: 0 0 0 3px var(--tacta-accent-muted);
+}
+
+.tacta-suiteql-runner .tacta-ss-prompt::placeholder {
+    color: var(--tacta-text-muted);
+}
+
+.tacta-suiteql-runner .tacta-ss-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    margin-top: var(--tacta-space-sm);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SEARCH DEFINITION DISPLAY
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-ss-definition {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--tacta-space-sm);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-summary {
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    margin-bottom: var(--tacta-space-sm);
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-summary-row {
+    display: flex;
+    gap: var(--tacta-space-sm);
+    padding: var(--tacta-space-xxs) 0;
+    font-size: var(--tacta-font-size-sm);
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-label {
+    font-weight: 600;
+    color: var(--tacta-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 70px;
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-value {
+    color: var(--tacta-text-secondary);
+    font-family: var(--tacta-font-mono);
+    font-size: var(--tacta-font-size-xs);
+    word-break: break-word;
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-json {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-json .tacta-code {
+    min-height: 60px;
+    max-height: 200px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.tacta-suiteql-runner .tacta-ss-definition-json textarea.tacta-sql-editor {
+    min-height: 80px;
+    max-height: 200px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SAVE ROW
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-ss-save-row {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    margin-top: var(--tacta-space-sm);
+    flex-shrink: 0;
+}
+
+.tacta-suiteql-runner .tacta-ss-save-row .tacta-input {
+    flex: 1;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SAVED SEARCH RESULTS (PREVIEW)
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-ss-results {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--tacta-space-sm);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.tacta-suiteql-runner .tacta-ss-results .tacta-table-wrapper {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   AI EXPLANATION (Saved Search tab)
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-ss-explanation {
+    margin-top: var(--tacta-space-sm);
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-secondary);
+    background: var(--tacta-bg);
+    border-left: 3px solid var(--tacta-info);
+    border-radius: var(--tacta-radius-sm);
+    line-height: 1.5;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   UTILITY
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-truncated-notice {
+    padding: var(--tacta-space-xs) var(--tacta-space-md);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-warning);
+    background: var(--tacta-warning-bg);
+    border-radius: var(--tacta-radius-sm);
+    margin-top: var(--tacta-space-xs);
+}

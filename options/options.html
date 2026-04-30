@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tactacam NS Toolkit — Settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="tacta-options">
+
+        <!-- ── Header ─────────────────────────────────────────────── -->
+        <header class="tacta-opt-header">
+            <div class="tacta-opt-header-left">
+                <div class="tacta-opt-logo">
+                    <span class="tacta-opt-logo-mark">T</span>
+                    <div class="tacta-opt-logo-text">
+                        <span class="tacta-opt-title">NS Toolkit</span>
+                        <span class="tacta-opt-subtitle">Settings</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tacta-opt-header-actions">
+                <button class="tacta-opt-btn tacta-opt-btn-secondary" id="importBtn" title="Import settings from JSON file">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M2 11v2.5h12V11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Import
+                </button>
+                <button class="tacta-opt-btn tacta-opt-btn-secondary" id="exportBtn" title="Export all settings as JSON file">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M2 11v2.5h12V11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M8 10V2M5 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Export
+                </button>
+                <button class="tacta-opt-btn tacta-opt-btn-danger" id="resetBtn" title="Reset all features to default states">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M2 2v5h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M3 9.5a6 6 0 1 0 1.3-4L2 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Reset to Defaults
+                </button>
+            </div>
+        </header>
+
+        <!-- ── Feature Management ─────────────────────────────────── -->
+        <main class="tacta-opt-main">
+            <section class="tacta-opt-section">
+                <h2 class="tacta-opt-section-title">Feature Management</h2>
+                <p class="tacta-opt-section-desc">
+                    Enable or disable individual features. Changes take effect immediately on open NetSuite tabs.
+                </p>
+                <div id="featureList" class="tacta-opt-feature-list"></div>
+            </section>
+
+
+            <!-- ── General Settings ───────────────────────────────────── -->
+            <section class="tacta-opt-section">
+                <h2 class="tacta-opt-section-title">General Settings</h2>
+                <div class="tacta-opt-settings-form">
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="closeOnClickOutside">Click outside panel to close</label>
+                            <span class="tacta-opt-setting-hint">When enabled, clicking outside a floating panel (Field Explorer, etc.) will close it. When disabled, you must click the X button.</span>
+                        </div>
+                        <label class="tacta-opt-toggle">
+                            <input type="checkbox" id="closeOnClickOutside">
+                            <span class="tacta-opt-toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="tacta-opt-setting-actions">
+                        <button class="tacta-opt-btn tacta-opt-btn-primary" id="saveGeneralSettings">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M12.5 14h-9A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H11l3 3v7.5a1.5 1.5 0 0 1-1.5 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M11 14V9H5v5M5 2v3h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── AI Settings (Claude API) ───────────────────────────── -->
+            <section class="tacta-opt-section">
+                <h2 class="tacta-opt-section-title">AI Settings</h2>
+                <p class="tacta-opt-section-desc">
+                    Configure Claude AI integration for the SuiteQL Runner. Your API key is stored locally and never sent anywhere except the Anthropic API.
+                </p>
+                <div class="tacta-opt-settings-form">
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="aiApiKey">Claude API Key</label>
+                            <span class="tacta-opt-setting-hint">Your Anthropic API key (starts with sk-ant-). Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color: #76c043;">console.anthropic.com</a></span>
+                        </div>
+                        <div class="tacta-opt-api-key-row">
+                            <input type="password" id="aiApiKey" class="tacta-opt-input" placeholder="sk-ant-api03-...">
+                            <button class="tacta-opt-btn tacta-opt-btn-secondary tacta-opt-btn-sm" id="toggleApiKeyVisibility" title="Show/hide API key" type="button">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" id="eyeIcon">
+                                    <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="aiModel">Claude Model</label>
+                            <span class="tacta-opt-setting-hint">Select which Claude model to use for AI-assisted queries. Sonnet is fastest and most cost-effective.</span>
+                        </div>
+                        <select id="aiModel" class="tacta-opt-select">
+                            <option value="claude-sonnet-4-5-20250514">Claude Sonnet 4.5 (recommended)</option>
+                            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
+                            <option value="claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
+                        </select>
+                    </div>
+                    <div class="tacta-opt-setting-actions">
+                        <button class="tacta-opt-btn tacta-opt-btn-secondary" id="testAIConnection" type="button">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M13.5 2.5l-11 11M2.5 2.5l11 11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" class="test-icon-x"/>
+                                <path d="M2 8l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" class="test-icon-check" style="display:none"/>
+                            </svg>
+                            Test Connection
+                        </button>
+                        <button class="tacta-opt-btn tacta-opt-btn-primary" id="saveAISettings" type="button">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M12.5 14h-9A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H11l3 3v7.5a1.5 1.5 0 0 1-1.5 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M11 14V9H5v5M5 2v3h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Save AI Settings
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Quick Search Settings ─────────────────────────────── -->
+            <section class="tacta-opt-section">
+                <h2 class="tacta-opt-section-title">Quick Search Settings</h2>
+                <p class="tacta-opt-section-desc">
+                    Choose which search types appear in the Quick Search toolbar on search pages and the dashboard.
+                </p>
+                <div class="tacta-opt-settings-form">
+                    <div id="qscTypeGroups" class="tacta-opt-qsc-groups"></div>
+                    <div class="tacta-opt-setting-actions">
+                        <button class="tacta-opt-btn tacta-opt-btn-secondary" id="qscSelectAll" type="button">Select All</button>
+                        <button class="tacta-opt-btn tacta-opt-btn-secondary" id="qscSelectNone" type="button">Select None</button>
+                        <button class="tacta-opt-btn tacta-opt-btn-primary" id="saveQscSettings" type="button">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M12.5 14h-9A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H11l3 3v7.5a1.5 1.5 0 0 1-1.5 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M11 14V9H5v5M5 2v3h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Save Search Types
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Account Color Settings ──────────────────────────── -->
+            <section class="tacta-opt-section tacta-opt-account-color-settings">
+                <h2 class="tacta-opt-section-title">Account Color Settings</h2>
+                <p class="tacta-opt-section-desc">
+                    Customize the header bar color per environment. Click a swatch to pick a color.
+                </p>
+                <div class="tacta-opt-settings-form">
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="acColorProd">Production</label>
+                            <span class="tacta-opt-setting-hint">Color for production accounts</span>
+                        </div>
+                        <input type="color" id="acColorProd" class="tacta-opt-color-input" value="#ff4444">
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="acColorSandbox">Sandbox</label>
+                            <span class="tacta-opt-setting-hint">Color for primary sandbox</span>
+                        </div>
+                        <input type="color" id="acColorSandbox" class="tacta-opt-color-input" value="#76c043">
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="acColorSandboxN">Sandbox 2+</label>
+                            <span class="tacta-opt-setting-hint">Color for additional sandboxes</span>
+                        </div>
+                        <input type="color" id="acColorSandboxN" class="tacta-opt-color-input" value="#4488ff">
+                    </div>
+                    <div class="tacta-opt-setting-actions">
+                        <button class="tacta-opt-btn tacta-opt-btn-primary" id="saveAccountColorSettings">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M12.5 14h-9A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H11l3 3v7.5a1.5 1.5 0 0 1-1.5 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M11 14V9H5v5M5 2v3h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Save Colors
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── About ──────────────────────────────────────────── -->
+            <section class="tacta-opt-section tacta-opt-about">
+                <h2 class="tacta-opt-section-title">About</h2>
+                <div class="tacta-opt-about-content">
+                    <div class="tacta-opt-about-row">
+                        <span class="tacta-opt-about-label">Extension</span>
+                        <span class="tacta-opt-about-value">Tactacam NS Toolkit</span>
+                    </div>
+                    <div class="tacta-opt-about-row">
+                        <span class="tacta-opt-about-label">Version</span>
+                        <span class="tacta-opt-about-value tacta-opt-mono">v1.0.0</span>
+                    </div>
+                    <div class="tacta-opt-about-row">
+                        <span class="tacta-opt-about-label">Features</span>
+                        <span class="tacta-opt-about-value" id="featureTotal">—</span>
+                    </div>
+                    <div class="tacta-opt-about-row">
+                        <span class="tacta-opt-about-label">Runtime</span>
+                        <span class="tacta-opt-about-value">Chrome Extension Manifest V3</span>
+                    </div>
+                    <div class="tacta-opt-about-row">
+                        <span class="tacta-opt-about-label">Target</span>
+                        <span class="tacta-opt-about-value">NetSuite (*.netsuite.com)</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ── Footer ─────────────────────────────────────────────── -->
+        <footer class="tacta-opt-footer">
+            <span class="tacta-opt-footer-brand">Tactacam NS Toolkit</span>
+            <span class="tacta-opt-footer-version">v1.0.0</span>
+        </footer>
+    </div>
+
+    <!-- Hidden file input for import -->
+    <input type="file" id="importFile" accept=".json" style="display: none;">
+
+    <script src="options.js"></script>
+</body>
+</html>
