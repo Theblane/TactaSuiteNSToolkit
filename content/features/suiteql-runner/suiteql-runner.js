@@ -3,7 +3,7 @@
  * Tactacam NS Toolkit - SuiteQL Runner (Content Script)
  *
  * Floating panel for running SuiteQL queries against NetSuite and building
- * saved searches with AI assistance (Claude API). Communicates with the
+ * saved searches with AI assistance. Communicates with the
  * background service worker for query execution and AI generation.
  *
  * Activation: 'tacta:featureActivated' custom event with featureId 'suiteql-runner'.
@@ -79,7 +79,7 @@
     /** @type {boolean} Whether the AI section is collapsed */
     var _aiCollapsed = true;
 
-    /** @type {boolean|null} Whether AI is configured (null = unchecked) */
+    /** @type {{configured: boolean, mode: string, provider: string}|null} AI settings state */
     var _aiConfigured = null;
 
     /** @type {object|null} Current saved search definition */
@@ -336,17 +336,23 @@
     // ────────────────────────────────────────────────────────────────
 
     /**
-     * Checks if the AI API key is configured in extension settings.
-     * @returns {Promise<boolean>}
+     * Checks if AI is configured in extension settings.
+     * @returns {Promise<{configured: boolean, mode: string, provider: string}>}
      */
     function _checkAIConfigured() {
         if (_aiConfigured !== null) return Promise.resolve(_aiConfigured);
         return _sendMessage({ action: 'getAISettings' }).then(function (settings) {
-            _aiConfigured = !!(settings && settings.apiKey);
+            var mode = settings && settings.mode ? settings.mode : 'manual';
+            var provider = settings && settings.provider ? settings.provider : 'anthropic';
+            _aiConfigured = {
+                configured: mode === 'manual' || (mode === 'api' && !!settings.apiKey),
+                mode: mode,
+                provider: provider
+            };
             return _aiConfigured;
         }).catch(function () {
-            _aiConfigured = false;
-            return false;
+            _aiConfigured = { configured: false, mode: 'off', provider: 'anthropic' };
+            return _aiConfigured;
         });
     }
 
@@ -1084,8 +1090,8 @@
             return;
         }
 
-        _checkAIConfigured().then(function (configured) {
-            if (!configured) {
+        _checkAIConfigured().then(function (aiState) {
+            if (!aiState.configured) {
                 _showAINoCfg();
                 return;
             }
@@ -1097,6 +1103,10 @@
                 prompt: prompt,
                 context: {}
             }).then(function (result) {
+                if (result && result.manual) {
+                    _handleManualAIResult(result, 'SuiteQL prompt');
+                    return;
+                }
                 if (result && result.query) {
                     if (_editorEl) {
                         _editorEl.value = result.query;
@@ -1148,9 +1158,32 @@
 
         var notice = _el('div', {
             className: 'tacta-sql-ai-nocfg',
-            textContent: 'Configure your Claude API key in Extension Settings to enable AI features.'
+            textContent: 'Set AI mode to Manual or configure an API key in Extension Settings to enable AI features.'
         });
         section.appendChild(notice);
+    }
+
+    function _handleManualAIResult(result, label) {
+        if (!result || !result.prompt) return;
+        if (window.TactaDOM && typeof window.TactaDOM.copyToClipboard === 'function') {
+            window.TactaDOM.copyToClipboard(result.prompt).then(function (ok) {
+                if (ok && window.TactaDOM) {
+                    window.TactaDOM.showToast(label + ' copied', 'success', 2500);
+                }
+            });
+        }
+        _showAIExplanation(result.explanation || 'Manual prompt copied. Paste it into your AI app, then use the returned JSON to update the query.');
+        _openManualProvider(result.provider);
+    }
+
+    function _openManualProvider(provider) {
+        var urls = {
+            anthropic: 'https://claude.ai/new',
+            openai: 'https://chatgpt.com/',
+            gemini: 'https://gemini.google.com/app'
+        };
+        var url = urls[provider];
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -1215,9 +1248,9 @@
             return;
         }
 
-        _checkAIConfigured().then(function (configured) {
-            if (!configured) {
-                _showSSExplanation('Configure your Claude API key in Extension Settings to enable AI features.');
+        _checkAIConfigured().then(function (aiState) {
+            if (!aiState.configured) {
+                _showSSExplanation('Set AI mode to Manual or configure an API key in Extension Settings to enable AI features.');
                 return;
             }
 
@@ -1231,6 +1264,10 @@
                 action: 'aiGenerateSavedSearch',
                 prompt: prompt
             }).then(function (result) {
+                if (result && result.manual) {
+                    _handleManualSavedSearchResult(result);
+                    return;
+                }
                 if (result && result.searchDef) {
                     _ssDefinition = result.searchDef;
                     _ssExplanation = result.explanation || '';
@@ -1254,6 +1291,19 @@
         if (!_ssExplanationEl) return;
         _ssExplanationEl.textContent = text;
         _ssExplanationEl.style.display = 'block';
+    }
+
+    function _handleManualSavedSearchResult(result) {
+        if (!result || !result.prompt) return;
+        if (window.TactaDOM && typeof window.TactaDOM.copyToClipboard === 'function') {
+            window.TactaDOM.copyToClipboard(result.prompt).then(function (ok) {
+                if (ok && window.TactaDOM) {
+                    window.TactaDOM.showToast('Saved search prompt copied', 'success', 2500);
+                }
+            });
+        }
+        _showSSExplanation(result.explanation || 'Manual prompt copied. Paste it into your AI app, then use the returned JSON to build the saved search.');
+        _openManualProvider(result.provider);
     }
 
     /**

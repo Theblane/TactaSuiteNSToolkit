@@ -82,20 +82,42 @@
                 </div>
             </section>
 
-            <!-- ── AI Settings (Claude API) ───────────────────────────── -->
+            <!-- AI Settings -->
             <section class="tacta-opt-section">
                 <h2 class="tacta-opt-section-title">AI Settings</h2>
                 <p class="tacta-opt-section-desc">
-                    Configure Claude AI integration for the SuiteQL Runner. Your API key is stored locally and never sent anywhere except the Anthropic API.
+                    Configure AI assistance for the SuiteQL Runner. Manual mode builds prompts for ChatGPT, Claude, or Gemini without an API key.
                 </p>
                 <div class="tacta-opt-settings-form">
                     <div class="tacta-opt-setting-row">
                         <div class="tacta-opt-setting-info">
-                            <label class="tacta-opt-setting-label" for="aiApiKey">Claude API Key</label>
-                            <span class="tacta-opt-setting-hint">Your Anthropic API key (starts with sk-ant-). Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color: #76c043;">console.anthropic.com</a></span>
+                            <label class="tacta-opt-setting-label" for="aiMode">AI Mode</label>
+                            <span class="tacta-opt-setting-hint">Manual copies a prompt for subscription users. API sends requests directly with your API key.</span>
+                        </div>
+                        <select id="aiMode" class="tacta-opt-select">
+                            <option value="manual">Manual Prompt</option>
+                            <option value="api">API</option>
+                            <option value="off">Off</option>
+                        </select>
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="aiProvider">Provider</label>
+                            <span class="tacta-opt-setting-hint">Select where API mode sends requests and which app Manual mode opens.</span>
+                        </div>
+                        <select id="aiProvider" class="tacta-opt-select">
+                            <option value="anthropic">Claude</option>
+                            <option value="openai">ChatGPT / OpenAI</option>
+                            <option value="gemini">Gemini</option>
+                        </select>
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="aiApiKey">API Key</label>
+                            <span class="tacta-opt-setting-hint" id="aiApiKeyHint">Required only for API mode. Manual mode does not use this key.</span>
                         </div>
                         <div class="tacta-opt-api-key-row">
-                            <input type="password" id="aiApiKey" class="tacta-opt-input" placeholder="sk-ant-api03-...">
+                            <input type="password" id="aiApiKey" class="tacta-opt-input" placeholder="API key for selected provider">
                             <button class="tacta-opt-btn tacta-opt-btn-secondary tacta-opt-btn-sm" id="toggleApiKeyVisibility" title="Show/hide API key" type="button">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" id="eyeIcon">
                                     <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -106,13 +128,16 @@
                     </div>
                     <div class="tacta-opt-setting-row">
                         <div class="tacta-opt-setting-info">
-                            <label class="tacta-opt-setting-label" for="aiModel">Claude Model</label>
-                            <span class="tacta-opt-setting-hint">Select which Claude model to use for AI-assisted queries. Sonnet is fastest and most cost-effective.</span>
+                            <label class="tacta-opt-setting-label" for="aiModel">Model</label>
+                            <span class="tacta-opt-setting-hint">Use the default unless your provider account requires a different model ID.</span>
                         </div>
                         <select id="aiModel" class="tacta-opt-select">
-                            <option value="claude-sonnet-4-5-20250514">Claude Sonnet 4.5 (recommended)</option>
-                            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
-                            <option value="claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
+                            <option value="claude-sonnet-4-5-20250514" data-provider="anthropic">Claude Sonnet 4.5</option>
+                            <option value="claude-haiku-4-5-20251001" data-provider="anthropic">Claude Haiku 4.5</option>
+                            <option value="gpt-5.3" data-provider="openai">GPT-5.3</option>
+                            <option value="gpt-5.3-mini" data-provider="openai">GPT-5.3 Mini</option>
+                            <option value="gemini-3-flash" data-provider="gemini">Gemini 3 Flash</option>
+                            <option value="gemini-3-pro" data-provider="gemini">Gemini 3 Pro</option>
                         </select>
                     </div>
                     <div class="tacta-opt-setting-actions">

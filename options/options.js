@@ -395,6 +395,17 @@
         if ($testAI) {
             $testAI.addEventListener('click', testAIConnection);
         }
+        const $aiMode = document.getElementById('aiMode');
+        const $aiProvider = document.getElementById('aiProvider');
+        if ($aiMode) {
+            $aiMode.addEventListener('change', updateAISettingsUI);
+        }
+        if ($aiProvider) {
+            $aiProvider.addEventListener('change', () => {
+                syncAIModelOptions(true);
+                updateAISettingsUI();
+            });
+        }
 
         // Quick Search settings
         const $saveQscBtn = document.getElementById('saveQscSettings');
@@ -486,20 +497,35 @@
 
     async function loadAISettings() {
         try {
-            const data = await chrome.storage.local.get(['tacta_ai_api_key', 'tacta_ai_model']);
+            const data = await chrome.storage.local.get([
+                'tacta_ai_mode',
+                'tacta_ai_provider',
+                'tacta_ai_api_key',
+                'tacta_ai_model'
+            ]);
+            const $mode = document.getElementById('aiMode');
+            const $provider = document.getElementById('aiProvider');
             const $key = document.getElementById('aiApiKey');
             const $model = document.getElementById('aiModel');
+            if ($mode) $mode.value = data.tacta_ai_mode || 'manual';
+            if ($provider) $provider.value = data.tacta_ai_provider || 'anthropic';
             if ($key && data.tacta_ai_api_key) $key.value = data.tacta_ai_api_key;
             if ($model && data.tacta_ai_model) $model.value = data.tacta_ai_model;
+            syncAIModelOptions(false);
+            updateAISettingsUI();
         } catch (_) {}
     }
 
     async function saveAISettings() {
+        const $mode = document.getElementById('aiMode');
+        const $provider = document.getElementById('aiProvider');
         const $key = document.getElementById('aiApiKey');
         const $model = document.getElementById('aiModel');
         await chrome.storage.local.set({
+            tacta_ai_mode: $mode ? $mode.value : 'manual',
+            tacta_ai_provider: $provider ? $provider.value : 'anthropic',
             tacta_ai_api_key: $key ? $key.value.trim() : '',
-            tacta_ai_model: $model ? $model.value : 'claude-sonnet-4-5-20250514'
+            tacta_ai_model: $model ? $model.value : getDefaultAIModel($provider ? $provider.value : 'anthropic')
         });
         // Visual feedback
         const btn = document.getElementById('saveAISettings');
@@ -508,6 +534,53 @@
             btn.textContent = 'Saved!';
             btn.disabled = true;
             setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
+        }
+    }
+
+    function getDefaultAIModel(provider) {
+        if (provider === 'openai') return 'gpt-5.3';
+        if (provider === 'gemini') return 'gemini-3-flash';
+        return 'claude-sonnet-4-5-20250514';
+    }
+
+    function syncAIModelOptions(resetToDefault) {
+        const $provider = document.getElementById('aiProvider');
+        const $model = document.getElementById('aiModel');
+        if (!$provider || !$model) return;
+        const provider = $provider.value || 'anthropic';
+        let visibleSelected = false;
+        Array.from($model.options).forEach((opt) => {
+            const visible = opt.dataset.provider === provider;
+            opt.hidden = !visible;
+            opt.disabled = !visible;
+            if (visible && opt.selected) visibleSelected = true;
+        });
+        if (resetToDefault || !visibleSelected) {
+            $model.value = getDefaultAIModel(provider);
+        }
+    }
+
+    function updateAISettingsUI() {
+        const $mode = document.getElementById('aiMode');
+        const $provider = document.getElementById('aiProvider');
+        const $key = document.getElementById('aiApiKey');
+        const $test = document.getElementById('testAIConnection');
+        const $hint = document.getElementById('aiApiKeyHint');
+        const mode = $mode ? $mode.value : 'manual';
+        const apiMode = mode === 'api';
+        if ($key) {
+            $key.disabled = !apiMode;
+            $key.placeholder = apiMode ? 'API key for selected provider' : 'Not used in Manual or Off mode';
+        }
+        if ($test) {
+            $test.disabled = !apiMode;
+            $test.title = apiMode ? 'Test API connection' : 'Only available in API mode';
+        }
+        if ($hint && $provider) {
+            const providerLabel = $provider.options[$provider.selectedIndex]?.textContent || 'selected provider';
+            $hint.textContent = apiMode
+                ? `Stored locally and sent only to ${providerLabel} API.`
+                : 'Manual mode copies prompts for use in a provider website or app.';
         }
     }
 
@@ -532,8 +605,14 @@
         $btn.innerHTML = '<span class="tacta-opt-spinner"></span> Testing...';
 
         try {
+            const $mode = document.getElementById('aiMode');
             const $key = document.getElementById('aiApiKey');
             const apiKey = $key ? $key.value.trim() : '';
+
+            if ($mode && $mode.value !== 'api') {
+                showToast('Switch AI Mode to API before testing', 'error');
+                return;
+            }
 
             if (!apiKey) {
                 showToast('Please enter an API key first', 'error');
@@ -548,7 +627,7 @@
             const result = await sendMessage({ action: 'testAIConnection' });
 
             if (result && result.success) {
-                showToast('Connection successful! Claude API is working.', 'success');
+                showToast('Connection successful! AI provider is working.', 'success');
             } else if (result && result.status === 401) {
                 showToast('Invalid API key. Please check your key.', 'error');
             } else {

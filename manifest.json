@@ -26,7 +26,9 @@
   ],
   "host_permissions": [
     "https://*.netsuite.com/*",
-    "https://api.anthropic.com/*"
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "content_scripts": [
     {
