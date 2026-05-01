@@ -14,7 +14,7 @@
   var PAGE_FEATURES = [
     {
       test: /\/app\/common\/search\/search\.nl/i,
-      features: ['field-finder', 'quick-search-creation', 'saved-search-export']
+      features: ['field-finder', 'quick-search-creation', 'saved-search-export', 'suitescript-exporter']
     },
     {
       test: /\/app\//i,
@@ -30,11 +30,19 @@
     },
     {
       test: /\/app\/common\/scripting\/script\.nl/i,
-      features: ['script-analyzer']
+      features: ['script-analyzer', 'console-tools']
     },
     {
       test: /\/app\/common\/workflow\/setup\//i,
-      features: ['workflow-colors']
+      features: ['workflow-colors', 'field-finder', 'console-tools']
+    },
+    {
+      test: /\/app\/common\/dataset\//i,
+      features: ['suitescript-exporter']
+    },
+    {
+      test: /\/app\/common\/workbook\//i,
+      features: ['suitescript-exporter']
     }
   ];
 

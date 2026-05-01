@@ -404,3 +404,26 @@
     font-size: var(--tacta-font-size-sm, 12px);
     text-align: center;
 }
+
+.tacta-sa__source-card {
+    margin: 8px 0 10px 0;
+    max-width: 980px;
+    padding: 10px 12px;
+    border: 1px solid var(--tacta-border, #d0d7de);
+    border-radius: 6px;
+    background: var(--tacta-bg, #ffffff);
+    color: var(--tacta-text, #1f2328);
+    font-family: var(--tacta-font-family, Arial, sans-serif);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.tacta-sa__source-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.tacta-sa__source-body div {
+    margin: 3px 0;
+    word-break: break-word;
+}

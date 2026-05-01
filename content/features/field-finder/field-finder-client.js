@@ -21,7 +21,9 @@
     // Dropdown names that contain field lists in saved searches
     var FIELD_DROPDOWN_NAMES = [
         'rffield', 'filterfilter', 'sort1', 'sort2', 'sort3',
-        'field', 'dffield', 'fffilter'
+        'field', 'dffield', 'fffilter',
+        'fieldid', 'fieldname', 'fieldselect', 'workflowfield', 'wfconditionfield',
+        'conditionfield', 'actionfield', 'triggerfield', 'recordfield'
     ];
 
     // ────────────────────────────────────────────────────────────────
@@ -379,8 +381,10 @@
     function init() {
         if (typeof dropdowns === 'undefined') return;
 
+        var isWorkflow = /\/app\/common\/workflow\/setup\//i.test(window.location.href);
+
         for (var name in dropdowns) {
-            if (FIELD_DROPDOWN_NAMES.indexOf(dropdowns[name].name) >= 0) {
+            if (FIELD_DROPDOWN_NAMES.indexOf(dropdowns[name].name) >= 0 || (isWorkflow && looksLikeFieldDropdown(dropdowns[name]))) {
                 try {
                     if (!dropdowns[name].div) dropdowns[name].buildDiv();
                     enhanceDropdown(dropdowns[name]);
@@ -389,6 +393,21 @@
                 }
             }
         }
+    }
+
+    function looksLikeFieldDropdown(dd) {
+        if (!dd || !dd.valueArray || !dd.textArray || dd.valueArray.length < 8) return false;
+        var sampleSize = Math.min(dd.valueArray.length, 40);
+        var matches = 0;
+        for (var i = 0; i < sampleSize; i++) {
+            var value = String(dd.valueArray[i] || '').toLowerCase();
+            var text = String(dd.textArray[i] || '').toLowerCase();
+            if (/^(cust(body|col|entity|item|record)|tran|entity|item|memo|amount|date|status|externalid|internalid)/.test(value) ||
+                /(field|amount|date|status|memo|customer|vendor|item|transaction)/.test(text)) {
+                matches++;
+            }
+        }
+        return matches >= Math.max(4, Math.floor(sampleSize * 0.2));
     }
 
     // Wait for NS form to be ready

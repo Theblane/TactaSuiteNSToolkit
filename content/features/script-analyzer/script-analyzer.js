@@ -679,6 +679,79 @@
         }
     }
 
+    function _isScriptRecordPage() {
+        return /\/app\/common\/scripting\/script\.nl/i.test(window.location.href);
+    }
+
+    function _findScriptFileUrl() {
+        var links = document.querySelectorAll('a[href*="/app/common/media/"], a[href*="mediaitem"]');
+        for (var i = 0; i < links.length; i++) {
+            var href = links[i].href || links[i].getAttribute('href') || '';
+            var label = (links[i].textContent || href || '').toLowerCase();
+            if (/\.(js|ts|ss)$/i.test(label) || /mediaitem/i.test(href)) {
+                return href.charAt(0) === '/' ? window.location.origin + href : href;
+            }
+        }
+        return null;
+    }
+
+    function _analyzeScriptSource(source) {
+        var modules = [], records = [], fields = [], files = [];
+        source.replace(/(?:define|require)\s*\(\s*\[([\s\S]*?)\]/g, function (_, deps) {
+            deps.replace(/['"]([^'"]+)['"]/g, function (_m, dep) {
+                if (modules.indexOf(dep) < 0) modules.push(dep);
+            });
+        });
+        source.replace(/record\.Type\.([A-Z0-9_]+)|type\s*:\s*['"]([a-z0-9_]+)['"]/gi, function (_, a, b) {
+            var value = a || b;
+            if (value && records.indexOf(value) < 0) records.push(value);
+        });
+        source.replace(/fieldId\s*:\s*['"]([^'"]+)['"]|getValue\s*\(\s*['"]([^'"]+)['"]|setValue\s*\(\s*['"]([^'"]+)['"]/g, function (_, a, b, c) {
+            var value = a || b || c;
+            if (value && fields.indexOf(value) < 0) fields.push(value);
+        });
+        source.replace(/file\.load\s*\(\s*(?:\{[\s\S]*?id\s*:\s*)?['"]?([^'"\}\),\s]+)['"]?/g, function (_, value) {
+            if (value && files.indexOf(value) < 0) files.push(value);
+        });
+        return { modules: modules, records: records, fields: fields, files: files };
+    }
+
+    function _renderScriptRecordAnalysis() {
+        var fileUrl = _findScriptFileUrl();
+        if (!fileUrl) return;
+
+        var panel = document.createElement('div');
+        panel.className = 'tacta-sa__source-card';
+        panel.innerHTML = '<div class="tacta-sa__source-title">Source Analysis</div><div class="tacta-sa__source-body">Loading script file...</div>';
+        var title = document.querySelector('.uir-page-title') || document.body.firstChild;
+        if (title && title.parentNode) title.parentNode.insertBefore(panel, title.nextSibling);
+        else document.body.appendChild(panel);
+
+        fetch(fileUrl, { credentials: 'same-origin' })
+            .then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.text();
+            })
+            .then(function (source) {
+                var analysis = _analyzeScriptSource(source);
+                panel.querySelector('.tacta-sa__source-body').innerHTML =
+                    '<div><strong>Modules:</strong> ' + _escapeHtml(analysis.modules.join(', ') || '-') + '</div>' +
+                    '<div><strong>Records:</strong> ' + _escapeHtml(analysis.records.join(', ') || '-') + '</div>' +
+                    '<div><strong>Fields:</strong> ' + _escapeHtml(analysis.fields.slice(0, 60).join(', ') || '-') + '</div>' +
+                    '<div><strong>External files:</strong> ' + _escapeHtml(analysis.files.join(', ') || '-') + '</div>' +
+                    '<div><a href="' + fileUrl + '" target="_blank" rel="noreferrer">Open script file</a></div>';
+            })
+            .catch(function (e) {
+                panel.querySelector('.tacta-sa__source-body').textContent = 'Could not inspect source file: ' + (e.message || String(e));
+            });
+    }
+
+    function _escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, function (ch) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+    }
+
     // ────────────────────────────────────────────────────────────────
     // Initialization
     // ────────────────────────────────────────────────────────────────
@@ -687,6 +760,10 @@
      * Main initialization: detect record type, build UI, query scripts.
      */
     function init() {
+        if (_isScriptRecordPage()) {
+            _renderScriptRecordAnalysis();
+        }
+
         // Detect record type.
         _recordType = _detectRecordType();
 

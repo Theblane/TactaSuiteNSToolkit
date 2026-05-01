@@ -72,6 +72,14 @@
       "matches": ["https://*.netsuite.com/app/common/workflow/setup/*"],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.netsuite.com/app/common/dataset/*",
+        "https://*.netsuite.com/app/common/workbook/*"
+      ],
+      "js": ["content/feature-loader.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

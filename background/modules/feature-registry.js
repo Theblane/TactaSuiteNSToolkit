@@ -62,6 +62,30 @@ export const FEATURES = [
     injectScripts: []
   },
   {
+    id: 'script-content-search',
+    label: 'Script Content Search',
+    group: 'developer',
+    description: 'Search SuiteScript files by source text and inspect module, record, field, and file references.',
+    defaultEnabled: false,
+    pageTypes: ['script-record', 'file-cabinet', 'suitelet', 'dashboard', 'other'],
+    trigger: 'popup',
+    contentScripts: ['content/features/script-content-search/script-content-search.js'],
+    contentStyles: ['content/features/script-content-search/script-content-search.css'],
+    injectScripts: []
+  },
+  {
+    id: 'console-tools',
+    label: 'Console Tools',
+    group: 'developer',
+    description: 'Adds window.TactaNSKit console helpers for quick current-record updates and inspection.',
+    defaultEnabled: true,
+    pageTypes: ['record-view', 'record-edit', 'search-edit', 'script-record', 'suitelet', 'workflow', 'other'],
+    trigger: 'auto',
+    contentScripts: ['content/features/console-tools/console-tools.js'],
+    contentStyles: [],
+    injectScripts: ['content/features/console-tools/console-tools-client.js']
+  },
+  {
     id: 'record-object',
     label: 'Record Object Viewer',
     group: 'developer',
@@ -89,6 +113,18 @@ export const FEATURES = [
 
   // ── Search ────────────────────────────────────────────────────────────────
   {
+    id: 'suitescript-exporter',
+    label: 'SuiteScript Exporter',
+    group: 'search',
+    description: 'Export saved search, dataset, and workbook pages to SuiteScript 2.x TypeScript scaffolds.',
+    defaultEnabled: true,
+    pageTypes: ['search-edit', 'dataset', 'workbook'],
+    trigger: 'auto',
+    contentScripts: ['content/features/suitescript-exporter/suitescript-exporter.js'],
+    contentStyles: ['content/features/suitescript-exporter/suitescript-exporter.css'],
+    injectScripts: []
+  },
+  {
     id: 'saved-search-export',
     label: 'Saved Search Export',
     group: 'search',
@@ -106,7 +142,7 @@ export const FEATURES = [
     group: 'search',
     description: 'Quick-filter search columns and criteria fields by ID or label.',
     defaultEnabled: true,
-    pageTypes: ['search-edit'],
+    pageTypes: ['search-edit', 'workflow'],
     trigger: 'auto',
     contentScripts: ['content/features/field-finder/field-finder.js'],
     contentStyles: ['content/features/field-finder/field-finder.css'],
