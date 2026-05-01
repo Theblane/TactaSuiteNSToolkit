@@ -25,7 +25,8 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "https://*.netsuite.com/*"
+    "https://*.netsuite.com/*",
+    "https://api.anthropic.com/*"
   ],
   "content_scripts": [
     {
@@ -35,6 +36,7 @@
         "shared/storage-utils.js",
         "shared/dom-utils.js",
         "shared/ns-bridge.js",
+        "shared/theme-manager.js",
         "content/ns-page-detector.js",
         "content/router.js"
       ],

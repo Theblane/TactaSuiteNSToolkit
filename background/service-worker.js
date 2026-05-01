@@ -119,8 +119,23 @@ async function handleMessage(message, sender) {
     case 'injectFeatureFiles': {
       const tabId = message.tabId || sender?.tab?.id;
       if (!tabId) throw new Error('No tab ID available');
+      if (message.featureId) {
+        await assertFeatureCanRun(message.featureId);
+      }
       if (message.css?.length) {
         await chrome.scripting.insertCSS({ target: { tabId }, files: message.css }).catch(e => console.warn('CSS injection failed:', e));
+      }
+      if (message.injectScripts?.length) {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['shared/ns-bridge.js'],
+          world: 'MAIN'
+        }).catch(() => {});
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: message.injectScripts,
+          world: 'MAIN'
+        });
       }
       if (message.js?.length) {
         await chrome.scripting.executeScript({ target: { tabId }, files: message.js });
@@ -134,6 +149,7 @@ async function handleMessage(message, sender) {
       if (!feature) {
         throw new Error(`Unknown feature: ${message.featureId}`);
       }
+      await assertFeatureCanRun(feature.id);
       const targetTabId = message.tabId || sender?.tab?.id;
       if (!targetTabId) throw new Error('No tab ID available');
       return executeFeatureScripts(feature, targetTabId);
@@ -240,6 +256,23 @@ async function handleMessage(message, sender) {
 
     default:
       throw new Error(`Unrecognised action: ${message.action}`);
+  }
+}
+
+async function assertFeatureCanRun(featureId) {
+  const feature = FEATURES.find((f) => f.id === featureId);
+  if (!feature) {
+    throw new Error(`Unknown feature: ${featureId}`);
+  }
+
+  if (await getMeetingMode()) {
+    throw new Error('Meeting mode is enabled.');
+  }
+
+  const states = await getFeatureStates();
+  const enabled = featureId in states ? states[featureId] === true : feature.defaultEnabled === true;
+  if (!enabled) {
+    throw new Error(`Feature is disabled: ${featureId}`);
   }
 }
 

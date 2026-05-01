@@ -99,6 +99,7 @@
         await loadState();
         renderFeatureList();
         $featureTotal.textContent = `${features.length} total`;
+        await loadThemeSettings();
         await loadAccountColorSettings();
         await loadGeneralSettings();
         await loadAISettings();
@@ -209,7 +210,8 @@
 
     /* ── Export Settings ──────────────────────────────────────────── */
 
-    function exportSettings() {
+    async function exportSettings() {
+        const themeData = await chrome.storage.local.get('tacta_theme_settings');
         const payload = {
             _meta: {
                 extension:  'Tactacam NS Toolkit',
@@ -217,6 +219,7 @@
                 exportedAt: new Date().toISOString(),
             },
             featureStates,
+            themeSettings: themeData.tacta_theme_settings || null,
         };
 
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -267,8 +270,16 @@
                 }
 
                 // Persist all at once
-                chrome.storage.local.set({ [STORAGE_KEY]: featureStates });
+                const updates = { [STORAGE_KEY]: featureStates };
+                if (data.themeSettings && typeof data.themeSettings === 'object') {
+                    updates.tacta_theme_settings = data.themeSettings;
+                    if (window.TactaThemeManager) {
+                        window.TactaThemeManager.apply(data.themeSettings);
+                    }
+                }
+                chrome.storage.local.set(updates);
                 renderFeatureList();
+                loadThemeSettings();
                 showToast(`Imported ${importCount} feature settings`, 'success');
 
             } catch {
@@ -349,6 +360,20 @@
             $saveGeneralBtn.addEventListener('click', saveGeneralSettings);
         }
 
+        // Theme settings
+        const $saveThemeBtn = document.getElementById('saveThemeSettings');
+        if ($saveThemeBtn) {
+            $saveThemeBtn.addEventListener('click', saveThemeSettings);
+        }
+        const $themeScheme = document.getElementById('themeScheme');
+        const $themeAccent = document.getElementById('themeAccent');
+        if ($themeScheme) {
+            $themeScheme.addEventListener('change', previewThemeSettings);
+        }
+        if ($themeAccent) {
+            $themeAccent.addEventListener('input', previewThemeSettings);
+        }
+
         // Account Color settings
         const $saveAcBtn = document.getElementById('saveAccountColorSettings');
         if ($saveAcBtn) {
@@ -383,6 +408,43 @@
         const $qscSelectNone = document.getElementById('qscSelectNone');
         if ($qscSelectNone) {
             $qscSelectNone.addEventListener('click', () => toggleAllQsc(false));
+        }
+    }
+
+    /* ── Theme Settings ───────────────────────────────────────────── */
+
+    async function loadThemeSettings() {
+        if (!window.TactaThemeManager) return;
+        const settings = await window.TactaThemeManager.load();
+        const $scheme = document.getElementById('themeScheme');
+        const $accent = document.getElementById('themeAccent');
+        if ($scheme) $scheme.value = settings.scheme;
+        if ($accent) $accent.value = settings.accent;
+    }
+
+    function getThemeFormSettings() {
+        const $scheme = document.getElementById('themeScheme');
+        const $accent = document.getElementById('themeAccent');
+        return {
+            scheme: $scheme ? $scheme.value : 'dark',
+            accent: $accent ? $accent.value : '#76c043'
+        };
+    }
+
+    function previewThemeSettings() {
+        if (!window.TactaThemeManager) return;
+        window.TactaThemeManager.apply(getThemeFormSettings());
+    }
+
+    async function saveThemeSettings() {
+        if (!window.TactaThemeManager) return;
+        await window.TactaThemeManager.save(getThemeFormSettings());
+        const btn = document.getElementById('saveThemeSettings');
+        if (btn) {
+            const orig = btn.innerHTML;
+            btn.textContent = 'Saved!';
+            btn.disabled = true;
+            setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
         }
     }
 

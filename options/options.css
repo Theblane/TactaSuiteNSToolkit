@@ -71,7 +71,7 @@ html {
 
 body {
     min-height: 100%;
-    background: #111111;
+    background: var(--tacta-bg);
     color: var(--tacta-text);
     font-family: var(--tacta-font-family);
     font-size: 14px;
@@ -87,7 +87,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #111111;
+    background: var(--tacta-bg);
 }
 
 ::-webkit-scrollbar-thumb {

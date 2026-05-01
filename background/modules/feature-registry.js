@@ -108,9 +108,9 @@ export const FEATURES = [
     defaultEnabled: true,
     pageTypes: ['search-edit'],
     trigger: 'auto',
-    contentScripts: [],
+    contentScripts: ['content/features/field-finder/field-finder.js'],
     contentStyles: ['content/features/field-finder/field-finder.css'],
-    injectScripts: ['content/features/field-finder/field-finder.js']
+    injectScripts: ['content/features/field-finder/field-finder-client.js']
   },
   {
     id: 'quick-search-creation',

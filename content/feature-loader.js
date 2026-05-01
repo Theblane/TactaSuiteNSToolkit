@@ -1,37 +1,17 @@
 /**
- * Tactacam NS Toolkit — Feature Loader (page-specific)
+ * Tactacam NS Toolkit - URL Feature Loader
  *
- * Secondary content script injected on specific URL patterns (search pages,
- * transaction pages, script pages, workflow pages) via manifest content_scripts.
- *
- * While the router.js handles generic auto-injection for all /app/* pages,
- * feature-loader.js supplements it for pages where features need to load
- * based on specific URL patterns rather than detected page types.  This is
- * useful when:
- *   - A feature needs its scripts earlier (document_end on a narrow match).
- *   - A feature only applies to a URL shape that the page detector might
- *     classify too broadly.
- *
- * Pattern → feature mappings are defined in PAGE_FEATURES below.
+ * Supplemental URL-based loader for NetSuite pages where page detection can be
+ * too broad. It still uses the background registry for feature file paths.
  */
 (function () {
   'use strict';
 
-  // Guard against double-init (the manifest may match more than one pattern
-  // for the same page, and router.js also runs on /app/*).
   if (window.__tactaFeatureLoaderRan) return;
   window.__tactaFeatureLoaderRan = true;
+  window.__tactaActivatedFeatures = window.__tactaActivatedFeatures || new Set();
 
-  // ---------------------------------------------------------------------------
-  // Page-pattern → feature mappings
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Each entry maps a URL test to the feature IDs that should be considered
-   * for injection.  The feature must still be enabled in storage; this list
-   * only declares *eligibility*.
-   */
-  const PAGE_FEATURES = [
+  var PAGE_FEATURES = [
     {
       test: /\/app\/common\/search\/search\.nl/i,
       features: ['field-finder', 'quick-search-creation', 'saved-search-export']
@@ -58,82 +38,95 @@
     }
   ];
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
+  function sendMessage(payload) {
+    return new Promise(function (resolve, reject) {
+      chrome.runtime.sendMessage(payload, function (response) {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response && response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
 
-  // Features that have been built and have files on disk.
-  const IMPLEMENTED = new Set([
-    'field-explorer', 'field-help', 'account-color', 'nav-search',
-    'better-page-titles', 'fixed-headers', 'record-object', 'field-finder', 'quick-search-creation',
-    'saved-search-export', 'script-analyzer', 'script-explorer', 'transaction-tree', 'split-view',
-    'workflow-colors', 'pdf-tools', 'csv-viewer', 'suiteql-runner'
-  ]);
+  function isFeatureEnabled(feature, featureStates) {
+    return Object.prototype.hasOwnProperty.call(featureStates, feature.id)
+      ? featureStates[feature.id] === true
+      : feature.defaultEnabled === true;
+  }
 
-  // Features in category subfolders override the default path.
-  const FL_PATH_OVERRIDES = {
-    'account-color': 'content/features/ns-utils/account-color',
-    'nav-search':    'content/features/ns-utils/nav-search'
-  };
+  async function loadContext() {
+    var features = [];
+    var featureStates = {};
+    var meetingMode = false;
 
-  function _flBasePath(id) { return FL_PATH_OVERRIDES[id] || `content/features/${id}`; }
-  function scriptPath(id) { return `${_flBasePath(id)}/${id}.js`;  }
-  function stylePath(id)  { return `${_flBasePath(id)}/${id}.css`; }
+    try {
+      features = await sendMessage({ action: 'getFeatures' }) || [];
+    } catch (_) {}
 
-  // ---------------------------------------------------------------------------
-  // Main
-  // ---------------------------------------------------------------------------
+    try {
+      featureStates = await sendMessage({ action: 'getFeatureStates' }) || {};
+    } catch (_) {
+      var data = await chrome.storage.local.get('featureStates');
+      featureStates = data.featureStates || {};
+    }
+
+    try {
+      meetingMode = await sendMessage({ action: 'getMeetingMode' });
+    } catch (_) {
+      var modeData = await chrome.storage.local.get('meetingMode');
+      meetingMode = modeData.meetingMode === true;
+    }
+
+    return { features: features, featureStates: featureStates, meetingMode: meetingMode === true };
+  }
+
+  async function activateFeature(feature) {
+    if (window.__tactaActivatedFeatures.has(feature.id)) return;
+    await sendMessage({
+      action: 'injectFeatureFiles',
+      featureId: feature.id,
+      css: feature.contentStyles || [],
+      js: feature.contentScripts || [],
+      injectScripts: feature.injectScripts || []
+    });
+    window.__tactaActivatedFeatures.add(feature.id);
+    window.dispatchEvent(new CustomEvent('tacta:featureActivated', {
+      detail: { featureId: feature.id }
+    }));
+  }
 
   async function run() {
-    const url = window.location.href;
-
-    // Determine which features are eligible for this URL.
-    const eligible = new Set();
-    for (const mapping of PAGE_FEATURES) {
-      if (mapping.test.test(url)) {
-        mapping.features.forEach((id) => eligible.add(id));
+    var eligible = new Set();
+    PAGE_FEATURES.forEach(function (mapping) {
+      if (mapping.test.test(window.location.href)) {
+        mapping.features.forEach(function (id) { eligible.add(id); });
       }
-    }
+    });
 
     if (eligible.size === 0) return;
 
-    // Check meeting mode.
-    try {
-      const data = await chrome.storage.local.get('meetingMode');
-      if (data.meetingMode === true) return;
-    } catch (_) { /* proceed */ }
+    var context = await loadContext();
+    if (context.meetingMode) return;
 
-    // Check feature states.
-    let featureStates = {};
-    try {
-      const data = await chrome.storage.local.get('featureStates');
-      featureStates = data.featureStates || {};
-    } catch (_) { /* empty */ }
+    var toInject = context.features.filter(function (feature) {
+      return eligible.has(feature.id) && isFeatureEnabled(feature, context.featureStates);
+    });
 
-    // Inject each eligible, enabled feature via background service worker (in parallel).
-    const toInject = [...eligible].filter(
-      (featureId) => IMPLEMENTED.has(featureId) && featureStates[featureId] === true
-    );
+    var results = await Promise.allSettled(toInject.map(function (feature) {
+      return activateFeature(feature);
+    }));
 
-    const results = await Promise.allSettled(
-      toInject.map((featureId) =>
-        chrome.runtime.sendMessage({
-          action: 'injectFeatureFiles',
-          featureId: featureId,
-          css: [stylePath(featureId)],
-          js: [scriptPath(featureId)]
-        })
-      )
-    );
-
-    results.forEach((result, idx) => {
+    results.forEach(function (result, idx) {
       if (result.status === 'rejected') {
-        console.warn(`[Tacta FeatureLoader] Failed to load "${toInject[idx]}":`, result.reason);
+        console.warn('[Tacta FeatureLoader] Failed to load "' + toInject[idx].id + '":', result.reason);
       }
     });
   }
 
-  // Execute once the DOM is ready.
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', run, { once: true });
   } else {

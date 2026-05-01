@@ -136,6 +136,7 @@
         detectEnvironment();
         renderFeatureGroups();
         renderActiveFeatures();
+        updateQuickActions();
         bindEvents();
         updateMeetingModeUI();
         if ($userTypeSelect) $userTypeSelect.value = userType;
@@ -219,7 +220,7 @@
     /* ── Quick Actions ────────────────────────────────────────────── */
 
     function handleQuickAction(actionId) {
-        if (meetingMode || !currentTabId) return;
+        if (meetingMode || !currentTabId || featureStates[actionId] !== true) return;
 
         sendMessage({
             action:    'executeFeature',
@@ -262,6 +263,15 @@
                     <span>${f.label}</span>
                 </div>`)
             .join('');
+    }
+
+    function updateQuickActions() {
+        if (!$quickActions) return;
+        $quickActions.querySelectorAll('.tacta-action-btn[data-action]').forEach((btn) => {
+            const enabled = featureStates[btn.dataset.action] === true;
+            btn.disabled = meetingMode || !enabled;
+            btn.classList.toggle('disabled', meetingMode || !enabled);
+        });
     }
 
 
@@ -354,6 +364,7 @@
         });
 
         renderActiveFeatures();
+        updateQuickActions();
     }
 
 
@@ -375,6 +386,7 @@
     function updateMeetingModeUI() {
         document.body.classList.toggle('meeting-mode', meetingMode);
         $meetingToggle.classList.toggle('active', meetingMode);
+        updateQuickActions();
     }
 
 
@@ -463,6 +475,7 @@
         // Re-render
         renderFeatureGroups();
         renderActiveFeatures();
+        updateQuickActions();
     }
 
 

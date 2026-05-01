@@ -327,6 +327,13 @@ body {
     box-shadow: none;
 }
 
+.tacta-action-btn:disabled,
+.tacta-action-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .tacta-action-btn svg {
     flex-shrink: 0;
 }
