@@ -61,6 +61,9 @@
     /** @type {number} Debounce timer for observer */
     var _debounceTimer = 0;
 
+    /** @type {{ requestId: string, lines: string[], rowCount: number }|null} */
+    var _allExportState = null;
+
     // ────────────────────────────────────────────────────────────────
     // Table detection
     // ────────────────────────────────────────────────────────────────
@@ -358,6 +361,37 @@
         _showToast('CSV downloaded (' + rows.length + ' rows, current page)', 'success');
     }
 
+    function _exportAllCSV() {
+        var params = _parseQueryParams(window.location.href);
+        var searchId = params.searchid || params.id || '';
+
+        if (!searchId) {
+            _showToast('Could not find a saved search ID in the page URL.', 'warning');
+            return;
+        }
+
+        if (_allExportState) {
+            _showToast('Full export is already running.', 'warning');
+            return;
+        }
+
+        var requestId = 'sse-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        _allExportState = {
+            requestId: requestId,
+            lines: [],
+            rowCount: 0
+        };
+
+        _showToast('Starting full saved search export...', 'info');
+        window.dispatchEvent(new CustomEvent('tacta:sse:exportAllRequest', {
+            detail: {
+                requestId: requestId,
+                searchId: searchId,
+                pageSize: 1000
+            }
+        }));
+    }
+
     /**
      * Exports the current results table as JSON.
      */
@@ -391,6 +425,47 @@
 
         _downloadFile(json, filename, 'application/json;charset=utf-8;');
         _showToast('JSON downloaded (' + rows.length + ' rows, current page)', 'success');
+    }
+
+    function _handleAllExportEvent(event) {
+        var detail = event.detail || {};
+        if (!_allExportState || detail.requestId !== _allExportState.requestId) return;
+
+        if (detail.type === 'start') {
+            var headers = detail.headers || [];
+            _allExportState.lines.push(headers.map(_csvEscape).join(','));
+            _showToast('Exporting ' + (detail.totalRows || 0) + ' rows across ' + (detail.totalPages || 0) + ' pages...', 'info');
+            return;
+        }
+
+        if (detail.type === 'chunk') {
+            var rows = detail.rows || [];
+            for (var i = 0; i < rows.length; i++) {
+                _allExportState.lines.push(rows[i].map(_csvEscape).join(','));
+            }
+            _allExportState.rowCount += rows.length;
+            return;
+        }
+
+        if (detail.type === 'progress') {
+            _showToast('Exported page ' + detail.page + ' of ' + detail.totalPages + ' (' + _allExportState.rowCount + ' rows)', 'info');
+            return;
+        }
+
+        if (detail.type === 'complete') {
+            var csv = _allExportState.lines.join('\r\n') + '\r\n';
+            var filename = _getSearchName() + '-all-' + _getTimestamp() + '.csv';
+            var rowCount = _allExportState.rowCount;
+            _downloadFile(csv, filename, 'text/csv;charset=utf-8;');
+            _allExportState = null;
+            _showToast('Full CSV downloaded (' + rowCount + ' rows)', 'success');
+            return;
+        }
+
+        if (detail.type === 'error') {
+            _showToast('Full export failed: ' + (detail.message || 'Unknown error'), 'error');
+            _allExportState = null;
+        }
     }
 
     /**
@@ -662,6 +737,8 @@
         // CSV button
         toolbar.appendChild(_createButton('CSV', ICON_CSV, 'Download as CSV (current page)', _exportCSV));
 
+        toolbar.appendChild(_createButton('All CSV', ICON_CSV, 'Download all saved search rows with N/search runPaged', _exportAllCSV));
+
         // JSON button
         toolbar.appendChild(_createButton('JSON', ICON_JSON, 'Download as JSON (current page)', _exportJSON));
 
@@ -816,6 +893,8 @@
             _render();
         }
     });
+
+    window.addEventListener('tacta:sse:allExportEvent', _handleAllExportEvent);
 
     // Auto-initialize
     init();

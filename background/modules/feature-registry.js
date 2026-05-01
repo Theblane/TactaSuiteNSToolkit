@@ -134,7 +134,7 @@ export const FEATURES = [
     trigger: 'auto',
     contentScripts: ['content/features/saved-search-export/saved-search-export.js'],
     contentStyles: ['content/features/saved-search-export/saved-search-export.css'],
-    injectScripts: []
+    injectScripts: ['content/features/saved-search-export/saved-search-export-client.js']
   },
   {
     id: 'field-finder',
