@@ -27,18 +27,58 @@
         return column.label || column.name || ('Column ' + (index + 1));
     }
 
+    function getSuiteScriptLoader() {
+        if (typeof require === 'function') return require;
+        if (typeof window.require === 'function') return window.require;
+        if (typeof window.requirejs === 'function') return window.requirejs;
+        return null;
+    }
+
+    function waitForSearchApi(callback, attemptsLeft) {
+        var loader = getSuiteScriptLoader();
+        if (loader || typeof window.nlapiLoadSearch === 'function') {
+            callback();
+            return;
+        }
+
+        if (attemptsLeft <= 0) {
+            callback();
+            return;
+        }
+
+        setTimeout(function () {
+            waitForSearchApi(callback, attemptsLeft - 1);
+        }, 250);
+    }
+
     function exportAllSavedSearch(requestId, searchId, pageSize) {
         if (!searchId) {
             emit({ requestId: requestId, type: 'error', message: 'No saved search ID was found in the page URL.' });
             return;
         }
 
-        if (typeof require !== 'function') {
-            emit({ requestId: requestId, type: 'error', message: 'NetSuite require() is not available on this page.' });
-            return;
-        }
+        waitForSearchApi(function () {
+            var loader = getSuiteScriptLoader();
+            if (loader) {
+                exportAllWithSearchModule(requestId, searchId, pageSize, loader);
+                return;
+            }
 
-        require(['N/search'], function (search) {
+            if (typeof window.nlapiLoadSearch === 'function') {
+                exportAllWithNlapi(requestId, searchId, pageSize);
+                return;
+            }
+
+            emit({
+                requestId: requestId,
+                type: 'error',
+                message: 'Neither SuiteScript 2.x require() nor nlapiLoadSearch() is available on this page. Open the saved search edit/results page after NetSuite finishes loading, then try again.'
+            });
+        }, 16);
+    }
+
+    function exportAllWithSearchModule(requestId, searchId, pageSize, loader) {
+        loader(['N/search'], function (search) {
             try {
                 var loadedSearch = search.load({ id: searchId });
                 var columns = loadedSearch.columns || [];
@@ -100,6 +140,77 @@
                 message: 'Could not load N/search: ' + (err && err.message ? err.message : String(err))
             });
         });
+    }
+
+    function exportAllWithNlapi(requestId, searchId, pageSize) {
+        try {
+            var loadedSearch = window.nlapiLoadSearch(null, searchId);
+            var columns = loadedSearch.getColumns ? loadedSearch.getColumns() : [];
+            var headers = columns.map(function (column, index) {
+                try {
+                    return column.getLabel() || column.getName() || ('Column ' + (index + 1));
+                } catch (_) {
+                    return 'Column ' + (index + 1);
+                }
+            });
+            var resultSet = loadedSearch.runSearch();
+            var chunkSize = Math.min(pageSize || 1000, 1000);
+            var start = 0;
+            var page = 0;
+            var totalRows = 0;
+
+            emit({
+                requestId: requestId,
+                type: 'start',
+                headers: headers,
+                totalRows: 0,
+                totalPages: 0
+            });
+
+            while (true) {
+                var results = resultSet.getResults(start, start + chunkSize) || [];
+                if (!results.length) break;
+                page++;
+                totalRows += results.length;
+
+                emit({
+                    requestId: requestId,
+                    type: 'chunk',
+                    page: page,
+                    totalPages: '?',
+                    rows: results.map(function (result) {
+                        return columns.map(function (column) {
+                            var text = '';
+                            var value = '';
+                            try { text = result.getText(column); } catch (_) {}
+                            try { value = result.getValue(column); } catch (_) {}
+                            return text || value || '';
+                        });
+                    })
+                });
+
+                emit({
+                    requestId: requestId,
+                    type: 'progress',
+                    page: page,
+                    totalPages: '?',
+                    exportedRows: totalRows,
+                    totalRows: totalRows
+                });
+
+                if (results.length < chunkSize) break;
+                start += chunkSize;
+            }
+
+            emit({
+                requestId: requestId,
+                type: 'complete',
+                totalRows: totalRows,
+                totalPages: page
+            });
+        } catch (e) {
+            emit({ requestId: requestId, type: 'error', message: e && e.message ? e.message : String(e) });
+        }
     }
 
     window.addEventListener('tacta:sse:exportAllRequest', function (event) {
