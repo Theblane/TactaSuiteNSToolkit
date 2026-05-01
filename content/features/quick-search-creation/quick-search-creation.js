@@ -39,6 +39,12 @@
     /** @type {number} Minimum query length to trigger search */
     var MIN_QUERY_LENGTH = 2;
 
+    /** @type {number} How long to reuse identical search results on the current page */
+    var CACHE_TTL_MS = 120000;
+
+    /** @type {number} Maximum number of search result sets to keep on this page */
+    var MAX_CACHE_ENTRIES = 30;
+
     /** SVG markup for the magnifying glass icon */
     var MAGNIFIER_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><line x1="15" y1="15" x2="21" y2="21"/></svg>';
 
@@ -122,11 +128,11 @@
         {
             key: 'customers',
             label: 'Customers',
-            buildQuery: function (q) {
+            buildQuery: function (q, includeInactives) {
                 return {
                     sql: 'SELECT c.id, c.entityid, c.companyname, c.email ' +
                          'FROM Customer c ' +
-                         'WHERE c.isinactive = \'F\' ' +
+                         'WHERE ' + (includeInactives ? '1 = 1 ' : 'c.isinactive = \'F\' ') +
                          'AND (c.entityid LIKE ? OR c.companyname LIKE ? OR c.email LIKE ?) ' +
                          'FETCH FIRST 5 ROWS ONLY',
                     params: ['%' + q + '%', '%' + q + '%', '%' + q + '%']
@@ -146,11 +152,11 @@
         {
             key: 'items',
             label: 'Items',
-            buildQuery: function (q) {
+            buildQuery: function (q, includeInactives) {
                 return {
                     sql: 'SELECT i.id, i.itemid, i.displayname, BUILTIN.DF(i.type) AS typename ' +
                          'FROM Item i ' +
-                         'WHERE i.isinactive = \'F\' ' +
+                         'WHERE ' + (includeInactives ? '1 = 1 ' : 'i.isinactive = \'F\' ') +
                          'AND (i.itemid LIKE ? OR i.displayname LIKE ?) ' +
                          'FETCH FIRST 5 ROWS ONLY',
                     params: ['%' + q + '%', '%' + q + '%']
@@ -170,11 +176,11 @@
         {
             key: 'vendors',
             label: 'Vendors',
-            buildQuery: function (q) {
+            buildQuery: function (q, includeInactives) {
                 return {
                     sql: 'SELECT v.id, v.entityid, v.companyname ' +
                          'FROM Vendor v ' +
-                         'WHERE v.isinactive = \'F\' ' +
+                         'WHERE ' + (includeInactives ? '1 = 1 ' : 'v.isinactive = \'F\' ') +
                          'AND (v.entityid LIKE ? OR v.companyname LIKE ?) ' +
                          'FETCH FIRST 5 ROWS ONLY',
                     params: ['%' + q + '%', '%' + q + '%']
@@ -194,11 +200,11 @@
         {
             key: 'employees',
             label: 'Employees',
-            buildQuery: function (q) {
+            buildQuery: function (q, includeInactives) {
                 return {
                     sql: 'SELECT e.id, e.entityid, e.firstname, e.lastname ' +
                          'FROM Employee e ' +
-                         'WHERE e.isinactive = \'F\' ' +
+                         'WHERE ' + (includeInactives ? '1 = 1 ' : 'e.isinactive = \'F\' ') +
                          'AND (e.entityid LIKE ? OR (e.firstname || \' \' || e.lastname) LIKE ?) ' +
                          'FETCH FIRST 5 ROWS ONLY',
                     params: ['%' + q + '%', '%' + q + '%']
@@ -273,6 +279,9 @@
     /** @type {boolean} Whether a search is currently in progress */
     var _isLoading = false;
 
+    /** @type {Map<string, { createdAt: number, groups: Array }>} In-page result cache */
+    var _searchCache = new Map();
+
     /** @type {HTMLElement|null} Cached reference to the wrapper element */
     var _wrapperEl = null;
 
@@ -342,8 +351,14 @@
      * @returns {Promise<Array<{ key: string, label: string, items: Array }>|null>}
      */
     function _runSearch(query, reqId) {
+        var cacheKey = _getCacheKey(query);
+        var cached = _getCachedSearch(cacheKey);
+        if (cached) {
+            return Promise.resolve(cached);
+        }
+
         var promises = RECORD_QUERIES.map(function (rq) {
-            var q = rq.buildQuery(query);
+            var q = rq.buildQuery(query, _includeInactives);
             return _executeSuiteQL(q.sql, q.params)
                 .then(function (result) {
                     var rows = (result && result.rows) ? result.rows : [];
@@ -370,8 +385,34 @@
                     groups.push(result);
                 }
             }
+            _setCachedSearch(cacheKey, groups);
             return groups;
         });
+    }
+
+    function _getCacheKey(query) {
+        return String(query || '').trim().toLowerCase() + '|' + (_includeInactives ? 'all' : 'active');
+    }
+
+    function _getCachedSearch(cacheKey) {
+        var cached = _searchCache.get(cacheKey);
+        if (!cached) return null;
+        if ((Date.now() - cached.createdAt) > CACHE_TTL_MS) {
+            _searchCache.delete(cacheKey);
+            return null;
+        }
+        return cached.groups;
+    }
+
+    function _setCachedSearch(cacheKey, groups) {
+        _searchCache.set(cacheKey, {
+            createdAt: Date.now(),
+            groups: groups
+        });
+        while (_searchCache.size > MAX_CACHE_ENTRIES) {
+            var firstKey = _searchCache.keys().next().value;
+            _searchCache.delete(firstKey);
+        }
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -1004,6 +1045,7 @@
             }
             if (changes[INACTIVES_KEY]) {
                 _includeInactives = changes[INACTIVES_KEY].newValue === true;
+                _searchCache.clear();
                 needsRefresh = true;
             }
             if (needsRefresh) {
