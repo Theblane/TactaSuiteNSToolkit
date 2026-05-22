@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit - Context Menu Manager
+ * TactaSuite NS Toolkit - Context Menu Manager
+ *
+ * @author Blane Maher
  *
  * Registers right-click context menu items that are visible only on
  * *.netsuite.com pages.
@@ -9,7 +11,7 @@ export function setupContextMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'tacta-toolkit-parent',
-      title: 'Tactacam NS Toolkit',
+      title: 'TactaSuite NS Toolkit',
       contexts: ['page', 'editable', 'link'],
       documentUrlPatterns: ['https://*.netsuite.com/*']
     });

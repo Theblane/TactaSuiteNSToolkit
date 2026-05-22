@@ -1,6 +1,8 @@
 /**
  * field-help-client.js
- * Tactacam NS Toolkit — Field Help (Page World Script)
+ * TactaSuite NS Toolkit — Field Help (Page World Script)
+ *
+ * @author Blane Maher
  *
  * MV3-compliant rewrite — NO eval(), NO new Function().
  * Uses a MutationObserver to detect when NetSuite's field help popup

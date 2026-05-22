@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit - Theme Manager
+ * TactaSuite NS Toolkit - Theme Manager
+ *
+ * @author Blane Maher
  *
  * Applies user-selected toolkit theme variables in extension pages and
  * injected NetSuite UI. Stored values live in chrome.storage.local.

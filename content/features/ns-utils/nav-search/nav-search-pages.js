@@ -1,6 +1,8 @@
 /**
  * nav-search-pages.js
- * Tactacam NS Toolkit — Navigation Search Page Data
+ * TactaSuite NS Toolkit — Navigation Search Page Data
+ *
+ * @author Blane Maher
  *
  * Exports an array of common NetSuite pages used by the Navigation Search
  * feature. Each entry includes a human-readable title, the relative URL path,

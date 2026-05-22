@@ -1,6 +1,8 @@
 /**
  * script-analyzer.js
- * Tactacam NS Toolkit — Script Analyzer (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit — Script Analyzer (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Displays which SuiteScript deployments are active on the current record page
  * (User Event scripts, Client Scripts, Workflow Actions, etc.).
@@ -31,6 +33,9 @@
 
     /** @type {string} Root element ID */
     var ROOT_ID = 'tacta-script-analyzer';
+
+    /** @type {string} Source analysis card ID */
+    var SOURCE_CARD_ID = 'tacta-script-analyzer-source';
 
     /** @type {number} Delay (ms) before querying — let the page settle */
     var INIT_DELAY = 800;
@@ -302,6 +307,13 @@
     function _escapeSQL(str) {
         if (!str) return '';
         return str.replace(/'/g, "''");
+    }
+
+    function _isSuiteQLUnavailableError(err) {
+        var message = (err && err.message ? err.message : String(err || '')).toLowerCase();
+        return message.indexOf('require() is not available') >= 0 ||
+               message.indexOf('failed to load n/query') >= 0 ||
+               message.indexOf('n/query') >= 0;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -683,16 +695,74 @@
         return /\/app\/common\/scripting\/script\.nl/i.test(window.location.href);
     }
 
-    function _findScriptFileUrl() {
+    function _getCurrentScriptInternalId() {
+        var params = _parseQueryParams(window.location.href);
+        if (params.id && /^\d+$/.test(params.id)) return params.id;
+        var idInput = document.querySelector('input[name="id"], input#id');
+        if (idInput && /^\d+$/.test(idInput.value || '')) return idInput.value;
+        return null;
+    }
+
+    function _normalizeSuiteQLRows(result) {
+        if (Array.isArray(result)) return result;
+        if (result && Array.isArray(result.rows)) return result.rows;
+        if (result && Array.isArray(result.items)) return result.items;
+        if (result && Array.isArray(result.results)) return result.results;
+        return [];
+    }
+
+    function _resolveScriptFileFromSuiteQL() {
+        var scriptId = _getCurrentScriptInternalId();
+        if (!scriptId) return Promise.resolve(null);
+
+        var query = [
+            "SELECT",
+            "  s.scriptfile AS file_id,",
+            "  f.name AS file_name,",
+            "  f.url AS file_url",
+            "FROM script s",
+            "LEFT JOIN file f ON f.id = s.scriptfile",
+            "WHERE s.id = " + scriptId
+        ].join(' ');
+
+        return _sendToBackground({ action: 'executeSuiteQL', query: query })
+            .then(function (result) {
+                var rows = _normalizeSuiteQLRows(result);
+                if (!rows.length) return null;
+                var row = rows[0];
+                var url = row.file_url || row.url || row.fileurl || row[2];
+                var name = row.file_name || row.name || row.filename || row[1] || '';
+                if (!url) return null;
+                return {
+                    url: url.charAt(0) === '/' ? window.location.origin + url : url,
+                    name: name
+                };
+            })
+            .catch(function (e) {
+                console.warn('[Tacta ScriptAnalyzer] Could not resolve script file via SuiteQL:', e);
+                return null;
+            });
+    }
+
+    function _findScriptFileFromDom() {
         var links = document.querySelectorAll('a[href*="/app/common/media/"], a[href*="mediaitem"]');
         for (var i = 0; i < links.length; i++) {
             var href = links[i].href || links[i].getAttribute('href') || '';
             var label = (links[i].textContent || href || '').toLowerCase();
-            if (/\.(js|ts|ss)$/i.test(label) || /mediaitem/i.test(href)) {
-                return href.charAt(0) === '/' ? window.location.origin + href : href;
+            if (/\.(js|ts|ss)(?:\?|#|$)/i.test(href) || /\.(js|ts|ss)$/i.test(label)) {
+                return {
+                    url: href.charAt(0) === '/' ? window.location.origin + href : href,
+                    name: links[i].textContent || ''
+                };
             }
         }
         return null;
+    }
+
+    function _resolveScriptFile() {
+        return _resolveScriptFileFromSuiteQL().then(function (file) {
+            return file || _findScriptFileFromDom();
+        });
     }
 
     function _analyzeScriptSource(source) {
@@ -717,29 +787,65 @@
     }
 
     function _renderScriptRecordAnalysis() {
-        var fileUrl = _findScriptFileUrl();
-        if (!fileUrl) return;
+        if (document.getElementById(SOURCE_CARD_ID)) return;
 
-        var panel = document.createElement('div');
-        panel.className = 'tacta-sa__source-card';
-        panel.innerHTML = '<div class="tacta-sa__source-title">Source Analysis</div><div class="tacta-sa__source-body">Loading script file...</div>';
-        var title = document.querySelector('.uir-page-title') || document.body.firstChild;
-        if (title && title.parentNode) title.parentNode.insertBefore(panel, title.nextSibling);
-        else document.body.appendChild(panel);
+        var title = document.querySelector('.uir-page-title') || document.querySelector('h1') || document.body.firstChild;
+        var host = document.createElement('span');
+        host.id = SOURCE_CARD_ID;
+        host.className = 'tacta-sa__source-host';
+        host.innerHTML =
+            '<button type="button" class="tacta-sa__source-trigger" title="Show source analysis">Source Analysis</button>' +
+            '<div class="tacta-sa__source-card" hidden>' +
+            '  <div class="tacta-sa__source-title">Source Analysis</div>' +
+            '  <div class="tacta-sa__source-body">Loading script file...</div>' +
+            '</div>';
 
-        fetch(fileUrl, { credentials: 'same-origin' })
-            .then(function (res) {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.text();
+        if (title && title.parentNode) title.parentNode.insertBefore(host, title.nextSibling);
+        else document.body.appendChild(host);
+
+        var trigger = host.querySelector('.tacta-sa__source-trigger');
+        var panel = host.querySelector('.tacta-sa__source-card');
+
+        trigger.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var willOpen = panel.hidden;
+            panel.hidden = !willOpen;
+            trigger.classList.toggle('tacta-sa__source-trigger--active', willOpen);
+            trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!panel.hidden && !host.contains(e.target)) {
+                panel.hidden = true;
+                trigger.classList.remove('tacta-sa__source-trigger--active');
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        _resolveScriptFile()
+            .then(function (file) {
+                if (!file || !file.url) throw new Error('Could not find the script file URL.');
+                return fetch(file.url, { credentials: 'same-origin' }).then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.text().then(function (source) {
+                        return { source: source, fileUrl: file.url };
+                    });
+                });
             })
-            .then(function (source) {
+            .then(function (result) {
+                var source = result.source;
+                var fileUrl = result.fileUrl;
+                if (/^\s*<!doctype html/i.test(source) || /^\s*<html[\s>]/i.test(source)) {
+                    throw new Error('Resolved link returned a NetSuite page instead of source text.');
+                }
                 var analysis = _analyzeScriptSource(source);
                 panel.querySelector('.tacta-sa__source-body').innerHTML =
                     '<div><strong>Modules:</strong> ' + _escapeHtml(analysis.modules.join(', ') || '-') + '</div>' +
                     '<div><strong>Records:</strong> ' + _escapeHtml(analysis.records.join(', ') || '-') + '</div>' +
                     '<div><strong>Fields:</strong> ' + _escapeHtml(analysis.fields.slice(0, 60).join(', ') || '-') + '</div>' +
                     '<div><strong>External files:</strong> ' + _escapeHtml(analysis.files.join(', ') || '-') + '</div>' +
-                    '<div><a href="' + fileUrl + '" target="_blank" rel="noreferrer">Open script file</a></div>';
+                    '<div><a href="' + _escapeHtml(fileUrl) + '" target="_blank" rel="noreferrer">Open script file</a></div>';
             })
             .catch(function (e) {
                 panel.querySelector('.tacta-sa__source-body').textContent = 'Could not inspect source file: ' + (e.message || String(e));
@@ -756,10 +862,16 @@
     // Initialization
     // ────────────────────────────────────────────────────────────────
 
+    /** Guard against multiple initialisations (router + feature-loader + auto). */
+    var _inited = false;
+
     /**
      * Main initialization: detect record type, build UI, query scripts.
      */
     function init() {
+        if (_inited) return;
+        _inited = true;
+
         if (_isScriptRecordPage()) {
             _renderScriptRecordAnalysis();
         }
@@ -791,6 +903,14 @@
                 console.log('[Tacta ScriptAnalyzer] Found', _scripts.length, 'deployed scripts for', _recordType);
             })
             .catch(function (err) {
+                if (_isSuiteQLUnavailableError(err)) {
+                    console.log('[Tacta ScriptAnalyzer] SuiteQL is not available on this page. Skipping.');
+                    if (_root) {
+                        _root.remove();
+                        _root = null;
+                    }
+                    return;
+                }
                 console.warn('[Tacta ScriptAnalyzer] SuiteQL query failed:', err.message);
                 _updateBadge(0);
                 _renderError('Failed to load scripts: ' + err.message);
@@ -804,19 +924,15 @@
         setTimeout(init, INIT_DELAY);
     }
 
-    // Listen for the router's feature activation event.
+    // Single activation path: router (or feature-loader) dispatches
+    // `tacta:featureActivated` after injection. No auto-init — it caused
+    // init() to run twice or three times when both loaders fired on the
+    // same page.
     window.addEventListener('tacta:featureActivated', function (e) {
         if (e.detail && e.detail.featureId === 'script-analyzer') {
             _delayedInit();
         }
     });
-
-    // Auto-initialize.
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _delayedInit, { once: true });
-    } else {
-        _delayedInit();
-    }
 
     console.log('[Tacta Toolkit] Script Analyzer feature loaded.');
 })();

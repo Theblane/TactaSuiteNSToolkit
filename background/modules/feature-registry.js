@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit — Feature Registry
+ * TactaSuite NS Toolkit — Feature Registry
+ *
+ * @author Blane Maher
  *
  * Single source of truth for every feature the toolkit ships. Each entry
  * describes the feature's metadata, which page types it applies to, how it
@@ -101,7 +103,7 @@ export const FEATURES = [
     id: 'suiteql-runner',
     label: 'SuiteQL Runner',
     group: 'developer',
-    description: 'Run SuiteQL queries with AI assistance and build saved searches from natural language.',
+    description: 'Run SuiteQL queries against NetSuite — query editor, history, sortable results, CSV export.',
     defaultEnabled: true,
     pageTypes: ['record-view', 'record-edit', 'search-results', 'search-edit', 'search-list',
                 'script-record', 'suitelet', 'dashboard', 'list', 'setup', 'other'],
@@ -225,8 +227,8 @@ export const FEATURES = [
     pageTypes: ['record-view', 'record-edit', 'search-results', 'search-edit', 'search-list',
                 'script-record', 'suitelet', 'dashboard', 'list', 'setup', 'other'],
     trigger: 'auto',
-    contentScripts: ['content/features/account-color/account-color.js'],
-    contentStyles: ['content/features/account-color/account-color.css'],
+    contentScripts: ['content/features/ns-utils/account-color/account-color.js'],
+    contentStyles: ['content/features/ns-utils/account-color/account-color.css'],
     injectScripts: []
   },
   {
@@ -238,7 +240,10 @@ export const FEATURES = [
     pageTypes: ['record-view', 'record-edit', 'search-results', 'search-edit', 'search-list',
                 'script-record', 'suitelet', 'dashboard', 'list', 'setup', 'other'],
     trigger: 'auto',
-    contentScripts: ['content/features/ns-utils/nav-search/nav-search.js'],
+    contentScripts: [
+      'content/features/ns-utils/nav-search/nav-search-pages.js',
+      'content/features/ns-utils/nav-search/nav-search.js'
+    ],
     contentStyles: ['content/features/ns-utils/nav-search/nav-search.css'],
     injectScripts: []
   },

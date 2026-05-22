@@ -1,6 +1,8 @@
 /**
- * tactacam-ui.css
- * Tactacam NS Toolkit - Shared UI Component Styles
+ * tactasuite-ui.css
+ * TactaSuite NS Toolkit - Shared UI Component Styles
+ *
+ * @author Blane Maher
  *
  * All rules are scoped under .tacta-toolkit to avoid collisions
  * with NetSuite's own styles. Requires theme-vars.css to be loaded first.

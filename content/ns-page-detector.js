@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit — NetSuite Page Detector
+ * TactaSuite NS Toolkit — NetSuite Page Detector
+ *
+ * @author Blane Maher
  *
  * IIFE that exposes window.TactaPageDetector with a single detect() method.
  * Analyzes the current URL and page DOM to classify the NetSuite page into a

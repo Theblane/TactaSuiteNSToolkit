@@ -1,6 +1,8 @@
 /**
  * ns-utils.js
- * Tactacam NS Toolkit - NetSuite Utility Functions
+ * TactaSuite NS Toolkit - NetSuite Utility Functions
+ *
+ * @author Blane Maher
  *
  * Provides helper functions for extracting context from NetSuite pages
  * and URLs. Works in both content script and page-world contexts.

@@ -1,6 +1,8 @@
 /**
  * fixed-headers.css
- * Tactacam NS Toolkit - Fixed Headers Styles
+ * TactaSuite NS Toolkit - Fixed Headers Styles
+ *
+ * @author Blane Maher
  *
  * Makes sublist / machine header rows sticky so they remain visible when
  * scrolling long line-item lists on NetSuite record pages.

@@ -1,6 +1,8 @@
 /**
  * record-object.js
- * Tactacam NS Toolkit - Record Object Viewer (Content Script)
+ * TactaSuite NS Toolkit - Record Object Viewer (Content Script)
+ *
+ * @author Blane Maher
  *
  * Fetches the current NetSuite record as XML via &xml=T, parses it into
  * a structured JSON object, and displays it in a floating panel with an
@@ -10,7 +12,7 @@
  * Activation: popup message dispatches 'tacta:featureActivated' event
  * with featureId 'record-object'.
  *
- * @fileoverview Record Object Viewer content script for the Tactacam NS Toolkit.
+ * @fileoverview Record Object Viewer content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

@@ -1,6 +1,8 @@
 /**
  * field-finder.js (ISOLATED world stub)
- * Tactacam NS Toolkit - Field Finder
+ * TactaSuite NS Toolkit - Field Finder
+ *
+ * @author Blane Maher
  *
  * The actual Field Finder logic runs in the PAGE world via field-finder-client.js,
  * which needs access to NetSuite's internal `dropdowns` and `machines` objects.

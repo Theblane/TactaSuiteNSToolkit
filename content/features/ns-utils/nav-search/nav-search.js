@@ -1,6 +1,8 @@
 /**
  * nav-search.js
- * Tactacam NS Toolkit — Navigation Search (Content Script)
+ * TactaSuite NS Toolkit — Navigation Search (Content Script)
+ *
+ * @author Blane Maher
  *
  * Adds a keyboard-driven command-palette-style search overlay for quick
  * navigation across NetSuite pages. Triggered by Ctrl+Shift+K (or
@@ -78,31 +80,50 @@
 
     /**
      * Loads the built-in page list from the data file. Uses fetch() to read
-     * the file as text in the isolated content script world, then extracts
-     * the JSON array from the IIFE source.
+     * the file as text in the isolated content script world only as a fallback.
+     * The registry normally injects nav-search-pages.js before this script.
      */
     function loadBuiltinPages() {
         // If already loaded from a prior call, skip.
         if (_builtinPages.length > 0) return;
 
+        if (Array.isArray(window.__tactaNavSearchPages)) {
+            _builtinPages = window.__tactaNavSearchPages.slice();
+            return;
+        }
+
         var url = chrome.runtime.getURL('content/features/ns-utils/nav-search/nav-search-pages.js');
         fetch(url)
             .then(function (response) { return response.text(); })
             .then(function (text) {
-                // Extract the array between the first '[' and the matching '];'
-                var startIdx = text.indexOf('var NAV_SEARCH_PAGES = [');
-                if (startIdx === -1) return;
-                startIdx = text.indexOf('[', startIdx);
-                var endIdx = text.lastIndexOf('];');
-                if (endIdx === -1) return;
-                var arrayText = text.substring(startIdx, endIdx + 1);
-                // Use Function constructor to evaluate the array literal safely
-                // (it contains only static object literals with strings/arrays).
-                _builtinPages = (new Function('return ' + arrayText))();
+                _builtinPages = parseBuiltinPagesSource(text);
             })
             .catch(function (err) {
                 console.warn('[Tacta Toolkit] Failed to load nav-search pages data:', err);
             });
+    }
+
+    function parseBuiltinPagesSource(text) {
+        var pages = [];
+        var entryRegex = /\{\s*title:\s*'([^']*)',\s*path:\s*'([^']*)',\s*category:\s*'([^']*)',\s*keywords:\s*\[([^\]]*)\]\s*\}/g;
+        var match;
+        while ((match = entryRegex.exec(text))) {
+            pages.push({
+                title: match[1],
+                path: match[2],
+                category: match[3],
+                keywords: parseKeywordList(match[4])
+            });
+        }
+        return pages;
+    }
+
+    function parseKeywordList(raw) {
+        var keywords = [];
+        raw.replace(/'([^']*)'/g, function (_m, value) {
+            keywords.push(value);
+        });
+        return keywords;
     }
 
     /**

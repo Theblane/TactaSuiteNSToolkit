@@ -1,6 +1,8 @@
 /**
  * better-page-titles.js
- * Tactacam NS Toolkit — Better Page Titles (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit — Better Page Titles (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Rewrites the browser tab title on NetSuite pages to include the record
  * type and name/number, making it far easier to identify tabs when

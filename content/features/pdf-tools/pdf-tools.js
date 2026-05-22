@@ -1,6 +1,8 @@
 /**
  * pdf-tools.js
- * Tactacam NS Toolkit — PDF Tools (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit — PDF Tools (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Adds syntax helpers and live preview capabilities for NetSuite Advanced
  * PDF/HTML templates. Provides:

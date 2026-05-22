@@ -1,6 +1,8 @@
 /**
  * record-object.css
- * Tactacam NS Toolkit - Record Object Viewer Styles
+ * TactaSuite NS Toolkit - Record Object Viewer Styles
+ *
+ * @author Blane Maher
  *
  * Scoped under .tacta-record-object to avoid collisions.
  * Uses CSS custom properties from theme-vars.css.

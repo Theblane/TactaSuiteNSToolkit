@@ -1,6 +1,8 @@
 /**
  * split-view.js
- * Tactacam NS Toolkit - Split View (Content Script, Context Menu Trigger)
+ * TactaSuite NS Toolkit - Split View (Content Script, Context Menu Trigger)
+ *
+ * @author Blane Maher
  *
  * Opens the current NetSuite page (or a right-clicked link) in a side-by-side
  * split layout. Uses window.open() to create a popup window sized to the right
@@ -14,7 +16,7 @@
  * Activated by the `tacta:featureActivated` custom event with featureId
  * 'split-view', dispatched by the router after a context-menu click.
  *
- * @fileoverview Split View content script for the Tactacam NS Toolkit.
+ * @fileoverview Split View content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

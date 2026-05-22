@@ -1,9 +1,11 @@
 /**
  * quick-search-creation.css
- * Tactacam NS Toolkit - Quick Search Styles
+ * TactaSuite NS Toolkit - Quick Search Styles
+ *
+ * @author Blane Maher
  *
  * Compact icon next to NetSuite's search bar that expands into an overlay
- * search box with real-time record search results. Uses Tactacam dark theme
+ * search box with real-time record search results. Uses TactaSuite dark theme
  * via CSS custom properties from shared/theme-vars.css.
  */
 
@@ -18,6 +20,17 @@
     z-index: 10050;
     vertical-align: middle;
     margin-right: 6px;
+}
+
+.tacta-qsc-wrapper.tacta-qsc-floating {
+    position: fixed;
+    margin: 0;
+}
+
+.tacta-qsc-wrapper.tacta-qsc-before-native-search,
+.tacta-qsc-wrapper.tacta-qsc-after-logo {
+    margin-left: 8px;
+    margin-right: 8px;
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -414,6 +427,10 @@
     top: 8px;
     right: 200px;
     z-index: 10050;
+}
+
+.tacta-qsc-wrapper.tacta-qsc-unplaced {
+    display: none;
 }
 
 /* ════════════════════════════════════════════════════════════════════

@@ -1,6 +1,8 @@
 /**
  * field-help.js
- * Tactacam NS Toolkit — Field Help (Content Script)
+ * TactaSuite NS Toolkit — Field Help (Content Script)
+ *
+ * @author Blane Maher
  *
  * Minimal content script that injects the page-world client script
  * (field-help-client.js) into the NetSuite page. The client script

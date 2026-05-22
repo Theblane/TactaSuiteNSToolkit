@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit - URL Feature Loader
+ * TactaSuite NS Toolkit - URL Feature Loader
+ *
+ * @author Blane Maher
  *
  * Supplemental URL-based loader for NetSuite pages where page detection can be
  * too broad. It still uses the background registry for feature file paths.

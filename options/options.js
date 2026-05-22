@@ -1,6 +1,8 @@
 /**
  * options.js
- * Tactacam NS Toolkit — Options Page Controller
+ * TactaSuite NS Toolkit — Options Page Controller
+ *
+ * @author Blane Maher
  *
  * Full-page settings management: feature toggles, import/export,
  * reset to defaults.
@@ -102,7 +104,6 @@
         await loadThemeSettings();
         await loadAccountColorSettings();
         await loadGeneralSettings();
-        await loadAISettings();
         await loadQscSettings();
         bindEvents();
     }
@@ -214,7 +215,7 @@
         const themeData = await chrome.storage.local.get('tacta_theme_settings');
         const payload = {
             _meta: {
-                extension:  'Tactacam NS Toolkit',
+                extension:  'TactaSuite NS Toolkit',
                 version:    '1.0.0',
                 exportedAt: new Date().toISOString(),
             },
@@ -227,7 +228,7 @@
         const a    = document.createElement('a');
 
         a.href     = url;
-        a.download = `tacta-ns-toolkit-settings-${Date.now()}.json`;
+        a.download = `tactasuite-ns-toolkit-settings-${Date.now()}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -380,33 +381,6 @@
             $saveAcBtn.addEventListener('click', saveAccountColorSettings);
         }
 
-        // AI settings
-        const $saveAIBtn = document.getElementById('saveAISettings');
-        if ($saveAIBtn) {
-            $saveAIBtn.addEventListener('click', saveAISettings);
-        }
-
-        const $toggleKey = document.getElementById('toggleApiKeyVisibility');
-        if ($toggleKey) {
-            $toggleKey.addEventListener('click', toggleApiKeyVisibility);
-        }
-
-        const $testAI = document.getElementById('testAIConnection');
-        if ($testAI) {
-            $testAI.addEventListener('click', testAIConnection);
-        }
-        const $aiMode = document.getElementById('aiMode');
-        const $aiProvider = document.getElementById('aiProvider');
-        if ($aiMode) {
-            $aiMode.addEventListener('change', updateAISettingsUI);
-        }
-        if ($aiProvider) {
-            $aiProvider.addEventListener('change', () => {
-                syncAIModelOptions(true);
-                updateAISettingsUI();
-            });
-        }
-
         // Quick Search settings
         const $saveQscBtn = document.getElementById('saveQscSettings');
         if ($saveQscBtn) {
@@ -480,165 +454,6 @@
             btn.textContent = 'Saved!';
             btn.disabled = true;
             setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
-        }
-    }
-
-    /* ── AI Settings ─────────────────────────────────────────── */
-
-    // SECURITY NOTE: The API key is stored in chrome.storage.local for persistence
-    // across browser restarts. chrome.storage.local is NOT encrypted — it is readable
-    // by any code running in this extension's context. chrome.storage.session would be
-    // more secure (cleared on browser close) but requires the user to re-enter the key
-    // every session, which is too disruptive. The key is never exposed to content
-    // scripts or web pages. The testAIConnection call is routed through the background
-    // service worker to avoid exposing the key in options page network requests.
-    // NOTE: background/service-worker.js must handle a 'testAIConnection' message
-    // for the test button to work (see handler below).
-
-    async function loadAISettings() {
-        try {
-            const data = await chrome.storage.local.get([
-                'tacta_ai_mode',
-                'tacta_ai_provider',
-                'tacta_ai_api_key',
-                'tacta_ai_model'
-            ]);
-            const $mode = document.getElementById('aiMode');
-            const $provider = document.getElementById('aiProvider');
-            const $key = document.getElementById('aiApiKey');
-            const $model = document.getElementById('aiModel');
-            if ($mode) $mode.value = data.tacta_ai_mode || 'manual';
-            if ($provider) $provider.value = data.tacta_ai_provider || 'anthropic';
-            if ($key && data.tacta_ai_api_key) $key.value = data.tacta_ai_api_key;
-            if ($model && data.tacta_ai_model) $model.value = data.tacta_ai_model;
-            syncAIModelOptions(false);
-            updateAISettingsUI();
-        } catch (_) {}
-    }
-
-    async function saveAISettings() {
-        const $mode = document.getElementById('aiMode');
-        const $provider = document.getElementById('aiProvider');
-        const $key = document.getElementById('aiApiKey');
-        const $model = document.getElementById('aiModel');
-        await chrome.storage.local.set({
-            tacta_ai_mode: $mode ? $mode.value : 'manual',
-            tacta_ai_provider: $provider ? $provider.value : 'anthropic',
-            tacta_ai_api_key: $key ? $key.value.trim() : '',
-            tacta_ai_model: $model ? $model.value : getDefaultAIModel($provider ? $provider.value : 'anthropic')
-        });
-        // Visual feedback
-        const btn = document.getElementById('saveAISettings');
-        if (btn) {
-            const orig = btn.innerHTML;
-            btn.textContent = 'Saved!';
-            btn.disabled = true;
-            setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
-        }
-    }
-
-    function getDefaultAIModel(provider) {
-        if (provider === 'openai') return 'gpt-5.3';
-        if (provider === 'gemini') return 'gemini-3-flash';
-        return 'claude-sonnet-4-5-20250514';
-    }
-
-    function syncAIModelOptions(resetToDefault) {
-        const $provider = document.getElementById('aiProvider');
-        const $model = document.getElementById('aiModel');
-        if (!$provider || !$model) return;
-        const provider = $provider.value || 'anthropic';
-        let visibleSelected = false;
-        Array.from($model.options).forEach((opt) => {
-            const visible = opt.dataset.provider === provider;
-            opt.hidden = !visible;
-            opt.disabled = !visible;
-            if (visible && opt.selected) visibleSelected = true;
-        });
-        if (resetToDefault || !visibleSelected) {
-            $model.value = getDefaultAIModel(provider);
-        }
-    }
-
-    function updateAISettingsUI() {
-        const $mode = document.getElementById('aiMode');
-        const $provider = document.getElementById('aiProvider');
-        const $key = document.getElementById('aiApiKey');
-        const $test = document.getElementById('testAIConnection');
-        const $hint = document.getElementById('aiApiKeyHint');
-        const mode = $mode ? $mode.value : 'manual';
-        const apiMode = mode === 'api';
-        if ($key) {
-            $key.disabled = !apiMode;
-            $key.placeholder = apiMode ? 'API key for selected provider' : 'Not used in Manual or Off mode';
-        }
-        if ($test) {
-            $test.disabled = !apiMode;
-            $test.title = apiMode ? 'Test API connection' : 'Only available in API mode';
-        }
-        if ($hint && $provider) {
-            const providerLabel = $provider.options[$provider.selectedIndex]?.textContent || 'selected provider';
-            $hint.textContent = apiMode
-                ? `Stored locally and sent only to ${providerLabel} API.`
-                : 'Manual mode copies prompts for use in a provider website or app.';
-        }
-    }
-
-    function toggleApiKeyVisibility() {
-        const $key = document.getElementById('aiApiKey');
-        if (!$key) return;
-        const isPassword = $key.type === 'password';
-        $key.type = isPassword ? 'text' : 'password';
-        // Update icon
-        const $btn = document.getElementById('toggleApiKeyVisibility');
-        if ($btn) {
-            $btn.title = isPassword ? 'Hide API key' : 'Show API key';
-        }
-    }
-
-    async function testAIConnection() {
-        const $btn = document.getElementById('testAIConnection');
-        if (!$btn) return;
-
-        const origHTML = $btn.innerHTML;
-        $btn.disabled = true;
-        $btn.innerHTML = '<span class="tacta-opt-spinner"></span> Testing...';
-
-        try {
-            const $mode = document.getElementById('aiMode');
-            const $key = document.getElementById('aiApiKey');
-            const apiKey = $key ? $key.value.trim() : '';
-
-            if ($mode && $mode.value !== 'api') {
-                showToast('Switch AI Mode to API before testing', 'error');
-                return;
-            }
-
-            if (!apiKey) {
-                showToast('Please enter an API key first', 'error');
-                return;
-            }
-
-            // Save current key/model first so background has the latest values
-            await saveAISettings();
-
-            // Route the API call through the background service worker so the
-            // API key is never exposed in options page network requests.
-            const result = await sendMessage({ action: 'testAIConnection' });
-
-            if (result && result.success) {
-                showToast('Connection successful! AI provider is working.', 'success');
-            } else if (result && result.status === 401) {
-                showToast('Invalid API key. Please check your key.', 'error');
-            } else {
-                const detail = (result && result.error) || 'Unknown error';
-                showToast(`API error: ${detail}`, 'error');
-            }
-        } catch (err) {
-            showToast('Connection failed: ' + err.message, 'error');
-        } finally {
-            $btn.innerHTML = origHTML;
-            $btn.disabled = false;
         }
     }
 

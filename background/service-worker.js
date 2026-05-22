@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit — Background Service Worker
+ * TactaSuite NS Toolkit — Background Service Worker
+ *
+ * @author Blane Maher
  *
  * No persistent in-memory state — all state in chrome.storage (MV3 best practice).
  *
@@ -87,19 +89,6 @@ async function handleMessage(message, sender) {
       await setFeatureStates(message.states);
       return { success: true };
 
-    // -- AI test connection (from options page) -----------------------------
-    case 'testAIConnection': {
-      const aiSettings = await getAISettings();
-      if (aiSettings.mode !== 'api') return { error: 'AI mode is not set to API' };
-      if (!aiSettings.apiKey) return { error: 'No API key configured' };
-      try {
-        await callAIProvider(aiSettings, 'Reply with OK', 'Return only the word OK.');
-        return { success: true };
-      } catch (e) {
-        return { error: e.message };
-      }
-    }
-
     // -- Inject specific files for a feature (from router) ------------------
     case 'injectFeatureFiles': {
       const tabId = message.tabId || sender?.tab?.id;
@@ -182,31 +171,6 @@ async function handleMessage(message, sender) {
       const saTabId = message.tabId || sender?.tab?.id;
       if (!saTabId) throw new Error('No tab ID available');
       return nsRunInPage(saTabId, feSetFieldAttributeFn, [message.fieldId, message.attr, message.value]);
-    }
-
-    // -- AI Settings (SuiteQL Runner) ----------------------------------------
-    case 'getAISettings': {
-      return getAISettings();
-    }
-
-    case 'setAISettings': {
-      await chrome.storage.local.set({
-        tacta_ai_mode: message.mode || 'manual',
-        tacta_ai_provider: message.provider || 'anthropic',
-        tacta_ai_api_key: message.apiKey || '',
-        tacta_ai_model: message.model || defaultAIModel(message.provider || 'anthropic')
-      });
-      return { success: true };
-    }
-
-    // -- AI Generate SuiteQL Query ------------------------------------------
-    case 'aiGenerateQuery': {
-      return generateAIArtifact(message.prompt, 'suiteql', message.context);
-    }
-
-    // -- AI Generate Saved Search Definition --------------------------------
-    case 'aiGenerateSavedSearch': {
-      return generateAIArtifact(message.prompt, 'saved-search', message.context);
     }
 
     // -- Preview Saved Search (run without saving) --------------------------
@@ -392,7 +356,7 @@ async function executeFeatureScripts(feature, tabId) {
   });
   await chrome.scripting.insertCSS({
     target: { tabId },
-    files: ['shared/theme-vars.css', 'shared/tactacam-ui.css']
+    files: ['shared/theme-vars.css', 'shared/tactasuite-ui.css']
   });
 
   // Inject feature stylesheets (ignore errors for missing files).
@@ -856,208 +820,6 @@ function feSetFieldAttributeFn(fieldId, attr, value) {
     }
   } catch(e) { return { error: e.message }; }
   return { error: 'API not available for ' + attr };
-}
-
-// ---------------------------------------------------------------------------
-// AI provider helpers (SuiteQL Runner)
-// ---------------------------------------------------------------------------
-
-function defaultAIModel(provider) {
-    if (provider === 'openai') return 'gpt-5.3';
-    if (provider === 'gemini') return 'gemini-3-flash';
-    return 'claude-sonnet-4-5-20250514';
-}
-
-async function getAISettings() {
-    const data = await chrome.storage.local.get([
-        'tacta_ai_mode',
-        'tacta_ai_provider',
-        'tacta_ai_api_key',
-        'tacta_ai_model'
-    ]);
-    const provider = data.tacta_ai_provider || 'anthropic';
-    return {
-        mode: data.tacta_ai_mode || 'manual',
-        provider,
-        apiKey: data.tacta_ai_api_key || '',
-        model: data.tacta_ai_model || defaultAIModel(provider)
-    };
-}
-
-function buildAISystemPrompt(mode, context) {
-    if (mode === 'suiteql') {
-        return `You are a NetSuite SuiteQL expert. Generate a SuiteQL query based on the user's request.
-
-SuiteQL is Oracle-based SQL used in NetSuite. Key differences from standard SQL:
-- Use BUILTIN.DF() to get display/text values for foreign key fields (e.g., BUILTIN.DF(entity) for customer name)
-- Use BUILTIN.CF() for currency formatting
-- Table names: transaction, transactionline, customer, item, vendor, employee, account, subsidiary, department, location, classification, contact, entity, file, folder, note, message, customrecord_*, etc.
-- Common transaction fields: id, tranid, type, entity, trandate, status, memo, amount, netamount, foreigntotal
-- Common transactionline fields: transaction, item, quantity, rate, amount, line, subsidiary, department, location, class
-- JOIN syntax: use standard SQL JOINs
-- Date functions: TO_DATE('2024-01-01', 'YYYY-MM-DD'), ADD_MONTHS(SYSDATE, -3), TRUNC(SYSDATE)
-- String functions: UPPER(), LOWER(), SUBSTR(), INSTR(), NVL(), NVL2()
-- Pagination: use ROWNUM for limiting rows, or FETCH FIRST N ROWS ONLY
-- Transaction types: 'SalesOrd', 'CustInvc', 'ItemShip', 'VendBill', 'PurchOrd', 'CashSale', 'CustPymt', 'Journal', 'Transfer', 'InvAdjst', etc.
-- Transaction statuses vary by type. Use BUILTIN.DF(status) to see readable status.
-- For custom records: customrecord_xxx with custom fields custrecord_xxx
-- Always use table aliases for clarity
-- No CREATE, INSERT, UPDATE, DELETE — SuiteQL is read-only
-
-${context?.tables ? `\nAvailable custom tables in this account: ${context.tables.join(', ')}` : ''}
-
-Respond with ONLY a JSON object (no markdown, no code fences):
-{"query": "YOUR SQL HERE", "explanation": "Brief explanation of what the query does"}`;
-    }
-
-    return `You are a NetSuite Saved Search expert. Generate a saved search definition based on the user's request.
-
-NetSuite saved searches use these components:
-- type: The record type (e.g., "transaction", "customer", "item", "employee", "vendor", "salesorder", "invoice", "purchaseorder", "contact", "customrecord_xxx")
-- filters: Array of filter expressions. Each filter is [fieldId, operator, value] or [fieldId, operator, value1, value2]. Filters are joined with "AND" or "OR" strings between them. Operators: "is", "isnot", "anyof", "noneof", "startswith", "contains", "doesnotcontain", "isempty", "isnotempty", "equalto", "notequalto", "lessthan", "greaterthan", "between", "within", "before", "after", "onorbefore", "onorafter", "haskeywords"
-- columns: Array of column objects with: name (field ID), label (optional display name), sort (optional: "ASC" or "DESC"), summary (optional: "GROUP", "SUM", "COUNT", "AVG", "MIN", "MAX"), join (optional: join ID like "customer" or "item"), formula (optional: formula expression), formulatype (optional: "currency", "date", "float", "integer", "percent", "text")
-- For joined fields, use the join property: { name: "email", join: "customer" }
-- Common filters: ["mainline", "is", "T"], ["type", "anyof", "SalesOrd"], ["trandate", "within", "lastmonth"]
-- Date filter values: "today", "yesterday", "lastweek", "lastmonth", "lastquarter", "lastyear", "thisweek", "thismonth", "thisquarter", "thisyear", "lastsevendays", "lastthirtydays", "lastsixtydays", "lastninetydays"
-
-Respond with ONLY a JSON object (no markdown, no code fences):
-{"searchDef": {"type": "record_type", "filters": [...], "columns": [...]}, "explanation": "Brief explanation of what this search finds"}`;
-}
-
-function buildManualPrompt(userPrompt, mode, context) {
-    return buildAISystemPrompt(mode, context) + '\n\nUser request:\n' + userPrompt;
-}
-
-async function generateAIArtifact(userPrompt, mode, context) {
-    const settings = await getAISettings();
-
-    if (settings.mode === 'off') {
-        throw new Error('AI is turned off in Extension Settings.');
-    }
-
-    if (settings.mode === 'manual') {
-        return {
-            manual: true,
-            provider: settings.provider,
-            prompt: buildManualPrompt(userPrompt, mode, context),
-            explanation: 'Manual prompt generated. Paste it into your AI subscription app, then use the returned JSON to update the query or saved search.'
-        };
-    }
-
-    if (!settings.apiKey) {
-        throw new Error('API key not configured. Go to Extension Settings to add one or switch to Manual mode.');
-    }
-
-    const content = await callAIProvider(settings, userPrompt, buildAISystemPrompt(mode, context));
-    try {
-        return JSON.parse(content);
-    } catch {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-        throw new Error('Could not parse AI response as JSON.');
-    }
-}
-
-async function callAIProvider(settings, userPrompt, systemPrompt) {
-    if (settings.provider === 'openai') return callOpenAI(settings, userPrompt, systemPrompt);
-    if (settings.provider === 'gemini') return callGemini(settings, userPrompt, systemPrompt);
-    return callAnthropic(settings, userPrompt, systemPrompt);
-}
-
-async function callAnthropic(settings, userPrompt, systemPrompt) {
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': settings.apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-            model: settings.model || defaultAIModel('anthropic'),
-            max_tokens: 2048,
-            messages: [
-                { role: 'user', content: userPrompt }
-            ],
-            system: systemPrompt
-        })
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        if (response.status === 401) throw new Error('Invalid Claude API key. Check your key in Extension Settings.');
-        if (response.status === 429) throw new Error('Rate limit exceeded. Please wait a moment and try again.');
-        throw new Error(`Claude API error (${response.status}): ${errorBody}`);
-    }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-    if (!content) throw new Error('No response from Claude API.');
-    return content;
-}
-
-async function callOpenAI(settings, userPrompt, systemPrompt) {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${settings.apiKey}`
-        },
-        body: JSON.stringify({
-            model: settings.model || defaultAIModel('openai'),
-            input: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ]
-        })
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        if (response.status === 401) throw new Error('Invalid OpenAI API key. Check your key in Extension Settings.');
-        if (response.status === 429) throw new Error('Rate limit exceeded. Please wait a moment and try again.');
-        throw new Error(`OpenAI API error (${response.status}): ${errorBody}`);
-    }
-
-    const data = await response.json();
-    if (data.output_text) return data.output_text;
-    const parts = [];
-    (data.output || []).forEach((item) => {
-        (item.content || []).forEach((part) => {
-            if (part.text) parts.push(part.text);
-        });
-    });
-    const content = parts.join('\n').trim();
-    if (!content) throw new Error('No response from OpenAI API.');
-    return content;
-}
-
-async function callGemini(settings, userPrompt, systemPrompt) {
-    const model = encodeURIComponent(settings.model || defaultAIModel('gemini'));
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(settings.apiKey)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: userPrompt }] }]
-        })
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        if (response.status === 401 || response.status === 403) throw new Error('Invalid Gemini API key or project access. Check your key in Extension Settings.');
-        if (response.status === 429) throw new Error('Rate limit exceeded. Please wait a moment and try again.');
-        throw new Error(`Gemini API error (${response.status}): ${errorBody}`);
-    }
-
-    const data = await response.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const content = parts.map((part) => part.text || '').join('\n').trim();
-    if (!content) throw new Error('No response from Gemini API.');
-    return content;
 }
 
 // ---------------------------------------------------------------------------

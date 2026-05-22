@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit — Storage Manager
+ * TactaSuite NS Toolkit — Storage Manager
+ *
+ * @author Blane Maher
  *
  * Thin abstraction over chrome.storage.local for persisting feature toggle
  * states and global settings like meeting mode. All reads/writes are async
@@ -8,18 +10,6 @@
  * Storage layout:
  *   featureStates  -> { [featureId]: boolean }
  *   meetingMode    -> boolean
- *
- * SERVICE-WORKER INTEGRATION NOTE:
- * background/service-worker.js must:
- *  1. Import `setFeatureStates` (plural) from this module.
- *  2. Add a case for 'setFeatureStates' in handleMessage:
- *       case 'setFeatureStates':
- *         await setFeatureStates(message.states);
- *         return { success: true };
- *  3. Add a case for 'testAIConnection' in handleMessage to proxy
- *     the Anthropic API test call (so the options page never calls
- *     fetch directly with the API key):
- *       case 'testAIConnection': { ... }
  */
 
 const STORAGE_KEYS = {

@@ -1,6 +1,8 @@
 /**
  * fixed-headers.js
- * Tactacam NS Toolkit - Fixed Headers (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit - Fixed Headers (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Pins sublist / machine header rows so they stay visible when scrolling
  * long line-item lists on NetSuite record pages.
@@ -16,7 +18,7 @@
  * Runs automatically on record-view, record-edit, search-results, and
  * list pages. No popup activation needed.
  *
- * @fileoverview Fixed Headers content script for the Tactacam NS Toolkit.
+ * @fileoverview Fixed Headers content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

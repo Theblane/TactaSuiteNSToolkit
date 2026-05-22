@@ -1,6 +1,8 @@
 /**
  * field-explorer.js
- * Tactacam NS Toolkit - Field Explorer (Content Script)
+ * TactaSuite NS Toolkit - Field Explorer (Content Script)
+ *
+ * @author Blane Maher
  *
  * Inspects all fields on the current NetSuite record page.
  * Creates a sidebar panel using TactaDOM.createSidebar() and communicates
@@ -8,7 +10,7 @@
  *
  * Activation: popup message 'activateFeature' with featureId 'field-explorer'.
  *
- * @fileoverview Field Explorer content script for the Tactacam NS Toolkit.
+ * @fileoverview Field Explorer content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';
@@ -252,49 +254,66 @@
      * Opens the Field Explorer sidebar and begins loading field data.
      */
     function activate() {
-        // Close existing sidebar if open
-        if (_sidebarInstance) {
-            _sidebarInstance.close();
-            _sidebarInstance = null;
-        }
-
-        // Reset state
-        _fieldData = null;
-        _searchTerm = '';
-        _activeFilter = 'All';
-        _expandedFieldId = null;
-
-        // Inject feature CSS
-        if (typeof TactaDOM !== 'undefined' && TactaDOM.injectStylesheet) {
-            TactaDOM.injectStylesheet(chrome.runtime.getURL('content/features/field-explorer/field-explorer.css'));
-        }
-
-        // Create sidebar
-        _sidebarInstance = TactaDOM.createSidebar({
-            title: 'Field Explorer',
-            width: 420,
-            overlay: false,
-            onClose: function () {
+        try {
+            // Close existing sidebar if open
+            if (_sidebarInstance) {
+                _sidebarInstance.close();
                 _sidebarInstance = null;
-                _fieldData = null;
             }
-        });
 
-        // Add the scoping class
-        _sidebarInstance.sidebar.classList.add(SCOPE_CLASS);
+            // Reset state
+            _fieldData = null;
+            _searchTerm = '';
+            _activeFilter = 'All';
+            _expandedFieldId = null;
 
-        // Show loading state
-        _showLoading();
+            if (typeof TactaDOM === 'undefined' || !TactaDOM.createSidebar) {
+                console.error('[TactaFE] TactaDOM not available — shared/dom-utils.js was not injected before field-explorer.js.');
+                return;
+            }
 
-        // Fetch field data
-        _requestFieldData()
-            .then(function (data) {
-                _fieldData = data;
-                _buildUI();
-            })
-            .catch(function (err) {
-                _showError(err.message || 'Failed to load field data.');
+            // Inject feature CSS
+            if (TactaDOM.injectStylesheet) {
+                TactaDOM.injectStylesheet(chrome.runtime.getURL('content/features/field-explorer/field-explorer.css'));
+            }
+
+            // Create sidebar
+            _sidebarInstance = TactaDOM.createSidebar({
+                title: 'Field Explorer',
+                width: 420,
+                overlay: false,
+                onClose: function () {
+                    _sidebarInstance = null;
+                    _fieldData = null;
+                }
             });
+
+            if (!_sidebarInstance || !_sidebarInstance.sidebar) {
+                console.error('[TactaFE] createSidebar returned no sidebar element.');
+                return;
+            }
+
+            // Add the scoping class
+            _sidebarInstance.sidebar.classList.add(SCOPE_CLASS);
+
+            // Show loading state
+            _showLoading();
+
+            // Fetch field data
+            _requestFieldData()
+                .then(function (data) {
+                    _fieldData = data;
+                    _buildUI();
+                })
+                .catch(function (err) {
+                    _showError(err.message || 'Failed to load field data.');
+                });
+        } catch (e) {
+            console.error('[TactaFE] activate() threw:', e);
+            if (typeof TactaDOM !== 'undefined' && TactaDOM.showToast) {
+                TactaDOM.showToast('Field Explorer failed to open: ' + (e.message || e), 'error', 4000);
+            }
+        }
     }
 
     /**

@@ -1,6 +1,8 @@
 /**
  * field-explorer-client.js
- * Tactacam NS Toolkit - Field Explorer (Page World Script)
+ * TactaSuite NS Toolkit - Field Explorer (Page World Script)
+ *
+ * @author Blane Maher
  *
  * Runs in the NetSuite page context (not the extension isolated world)
  * to access NetSuite's native JavaScript APIs. Communicates with the

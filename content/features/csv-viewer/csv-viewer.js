@@ -1,12 +1,14 @@
 /**
  * csv-viewer.js
- * Tactacam NS Toolkit - CSV Import Viewer
+ * TactaSuite NS Toolkit - CSV Import Viewer
+ *
+ * @author Blane Maher
  *
  * Previews CSV files in a formatted table before submitting on
  * NetSuite CSV import pages. Reads the file from the file input,
  * parses it, and displays a searchable/scrollable preview table.
  *
- * @fileoverview CSV Viewer content script for the Tactacam NS Toolkit.
+ * @fileoverview CSV Viewer content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

@@ -1,6 +1,8 @@
 /**
  * dom-utils.js
- * Tactacam NS Toolkit - DOM Manipulation Helpers
+ * TactaSuite NS Toolkit - DOM Manipulation Helpers
+ *
+ * @author Blane Maher
  *
  * Provides factory functions for creating themed UI components
  * (panels, modals, toasts, sidebars, tables) and general DOM utilities.
@@ -8,7 +10,7 @@
  *
  * Exposes: window.TactaDOM
  *
- * @fileoverview DOM builder utilities for the Tactacam NS Toolkit.
+ * @fileoverview DOM builder utilities for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

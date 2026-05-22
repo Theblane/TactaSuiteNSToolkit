@@ -1,6 +1,8 @@
 /**
  * transaction-tree.js
- * Tactacam NS Toolkit — Transaction Tree (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit — Transaction Tree (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Visualizes the full transaction chain (e.g., SO -> IF -> INV -> Payment)
  * as an interactive tree on NetSuite record pages. Shows a clickable badge
@@ -14,7 +16,7 @@
  * Runs in the ISOLATED world (content script) with no page-world access
  * needed — all NetSuite data access goes through the service worker.
  *
- * @fileoverview Transaction Tree content script for the Tactacam NS Toolkit.
+ * @fileoverview Transaction Tree content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';
@@ -62,7 +64,8 @@
         'InvAdjst':   'IA',
         'OpprtntyO':  'OPP',
         'CardChrg':   'CC',
-        'CardRfnd':   'CCR'
+        'CardRfnd':   'CCR',
+        'InbShip':    'ISH'
     };
 
     /** @type {Object} Map of NetSuite internal type codes to full names */
@@ -91,7 +94,8 @@
         'InvAdjst':   'Inventory Adjustment',
         'OpprtntyO':  'Opportunity',
         'CardChrg':   'Credit Card Charge',
-        'CardRfnd':   'Credit Card Refund'
+        'CardRfnd':   'Credit Card Refund',
+        'InbShip':    'Inbound Shipment'
     };
 
     /** @type {Object} Map status keywords to CSS modifier classes */
@@ -226,7 +230,30 @@
             'JOIN transaction t2 ON ntll.nextdoc = t2.id ' +
             'WHERE ntll.previousdoc = ' + transId + ' OR ntll.nextdoc = ' + transId;
 
-        return _executeSuiteQL(sql).then(function (rows) {
+        // Inbound Shipments are linked to POs via inboundshipmentitemmember,
+        // not nexttransactionlinelink. Walk that table from either side.
+        // Use BUILTIN.DF(m.shipment) for the shipment display name (works
+        // regardless of which columns inboundshipment exposes via SuiteQL).
+        var inbSql =
+            'SELECT DISTINCT ' +
+            '  m.shipment, m.purchaseorder, ' +
+            '  BUILTIN.DF(m.shipment) AS ship_tranid, ' +
+            '  p.tranid AS po_tranid, p.type AS po_type, ' +
+            '  p.status AS po_status, p.trandate AS po_trandate, ' +
+            '  p.entity AS po_entity ' +
+            'FROM inboundshipmentitemmember m ' +
+            'LEFT JOIN transaction p ON m.purchaseorder = p.id ' +
+            'WHERE m.shipment = ' + transId + ' OR m.purchaseorder = ' + transId;
+
+        return Promise.all([
+            _executeSuiteQL(sql),
+            _executeSuiteQL(inbSql).catch(function (err) {
+                console.warn('[TactaTT] inboundshipment link query failed:', err && err.message);
+                return [];
+            })
+        ]).then(function (results) {
+            var rows = results[0];
+            var inbRows = results[1];
             var prevMap = {};
             var nextMap = {};
 
@@ -262,6 +289,34 @@
                 }
             }
 
+            // Inbound shipment <-> PO links. PO is upstream of the shipment.
+            for (var k = 0; k < inbRows.length; k++) {
+                var ir = inbRows[k];
+                if (ir.shipment === transId && ir.purchaseorder) {
+                    if (!prevMap[ir.purchaseorder]) {
+                        prevMap[ir.purchaseorder] = {
+                            id: ir.purchaseorder,
+                            tranid: ir.po_tranid,
+                            type: ir.po_type || 'PurchOrd',
+                            status: ir.po_status,
+                            trandate: ir.po_trandate,
+                            entity: ir.po_entity
+                        };
+                    }
+                } else if (ir.purchaseorder === transId && ir.shipment) {
+                    if (!nextMap[ir.shipment]) {
+                        nextMap[ir.shipment] = {
+                            id: ir.shipment,
+                            tranid: ir.ship_tranid,
+                            type: 'InbShip',
+                            status: null,
+                            trandate: null,
+                            entity: null
+                        };
+                    }
+                }
+            }
+
             var prevList = [];
             var nextList = [];
             var key;
@@ -292,7 +347,30 @@
                 _transactionCache[transId] = rows[0];
                 return rows[0];
             }
-            return null;
+            // Inbound Shipments live in inboundshipment, not transaction.
+            // Synthesize a transaction-shaped row. The SuiteQL projection on
+            // inboundshipment is narrow (no `status` / `vendor` / etc. in many
+            // accounts), so query only id + shipmentnumber and synthesize the
+            // rest as null.
+            var inbSql =
+                'SELECT id, ' +
+                '  shipmentnumber AS tranid, ' +
+                "  'InbShip' AS type, " +
+                '  NULL AS status, ' +
+                '  NULL AS trandate, ' +
+                '  NULL AS entity ' +
+                'FROM inboundshipment ' +
+                'WHERE id = ' + transId;
+            return _executeSuiteQL(inbSql).then(function (inbRows) {
+                if (inbRows.length > 0) {
+                    _transactionCache[transId] = inbRows[0];
+                    return inbRows[0];
+                }
+                return null;
+            }).catch(function (err) {
+                console.warn('[TactaTT] inboundshipment details query failed:', err && err.message);
+                return null;
+            });
         });
     }
 
@@ -999,14 +1077,24 @@
             'FROM nexttransactionlinelink ntll ' +
             'WHERE ntll.previousdoc = ' + _currentId + ' OR ntll.nextdoc = ' + _currentId;
 
-        _executeSuiteQL(countSql).then(function (rows) {
+        var inbCountSql =
+            'SELECT COUNT(DISTINCT CASE WHEN m.shipment = ' + _currentId +
+            ' THEN m.purchaseorder ELSE m.shipment END) AS linked_count ' +
+            'FROM inboundshipmentitemmember m ' +
+            'WHERE m.shipment = ' + _currentId + ' OR m.purchaseorder = ' + _currentId;
+
+        Promise.all([
+            _executeSuiteQL(countSql).catch(function () { return []; }),
+            _executeSuiteQL(inbCountSql).catch(function () { return []; })
+        ]).then(function (results) {
             var count = 0;
-            if (rows.length > 0 && rows[0].linked_count) {
-                count = parseInt(rows[0].linked_count, 10) || 0;
+            if (results[0].length > 0 && results[0][0].linked_count) {
+                count += parseInt(results[0][0].linked_count, 10) || 0;
+            }
+            if (results[1].length > 0 && results[1][0].linked_count) {
+                count += parseInt(results[1][0].linked_count, 10) || 0;
             }
             _createBadge(count);
-        }).catch(function () {
-            // Leave badge without count — not critical
         });
     }
 

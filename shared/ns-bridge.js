@@ -1,6 +1,8 @@
 /**
  * ns-bridge.js
- * Tactacam NS Toolkit - Content Script <-> Page World Messaging Bridge
+ * TactaSuite NS Toolkit - Content Script <-> Page World Messaging Bridge
+ *
+ * @author Blane Maher
  *
  * This file is designed to be injected into the PAGE context (not the
  * content script isolated world) via web_accessible_resources. It uses
@@ -27,7 +29,7 @@
  *
  * Exposes: window.TactaNSBridge
  *
- * @fileoverview Page-world messaging bridge for the Tactacam NS Toolkit.
+ * @fileoverview Page-world messaging bridge for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

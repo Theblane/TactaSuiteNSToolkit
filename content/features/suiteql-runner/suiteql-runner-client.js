@@ -1,6 +1,8 @@
 /**
  * suiteql-runner-client.js
- * Tactacam NS Toolkit - SuiteQL Runner Page-World Script
+ * TactaSuite NS Toolkit - SuiteQL Runner Page-World Script
+ *
+ * @author Blane Maher
  *
  * Runs in the MAIN world (page context) with access to NetSuite's
  * require() and native APIs. Provides schema discovery and search
@@ -94,12 +96,11 @@
     }
 
     // ────────────────────────────────────────────────────────────
-    // Table Column Discovery (for AI context)
+    // Table Column Discovery
     // ────────────────────────────────────────────────────────────
 
     /**
      * Get columns for a specific table using SuiteQL analytics.
-     * Useful for providing column context to the AI.
      */
     function discoverTableColumns(tableName) {
         if (typeof require !== 'function') {

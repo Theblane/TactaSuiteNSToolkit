@@ -1,6 +1,8 @@
 /**
  * storage-utils.js
- * Tactacam NS Toolkit - Chrome Storage Wrapper
+ * TactaSuite NS Toolkit - Chrome Storage Wrapper
+ *
+ * @author Blane Maher
  *
  * Provides a Promise-based abstraction over chrome.storage.local for
  * managing feature states, user settings, and meeting mode. All keys
@@ -8,7 +10,7 @@
  *
  * Exposes: window.TactaStorage
  *
- * @fileoverview Chrome storage utilities for the Tactacam NS Toolkit.
+ * @fileoverview Chrome storage utilities for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

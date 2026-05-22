@@ -1,6 +1,8 @@
 /**
  * workflow-colors.js
- * Tactacam NS Toolkit - Workflow Colors (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit - Workflow Colors (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Color-codes workflow states and transitions on NetSuite workflow setup
  * pages for easier visual parsing.
@@ -22,7 +24,7 @@
  *
  * Runs automatically on workflow setup pages (/app/common/workflow/setup/*).
  *
- * @fileoverview Workflow Colors content script for the Tactacam NS Toolkit.
+ * @fileoverview Workflow Colors content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

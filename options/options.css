@@ -1,8 +1,10 @@
 /**
  * options.css
- * Tactacam NS Toolkit — Options Page Stylesheet
+ * TactaSuite NS Toolkit — Options Page Stylesheet
  *
- * Full-page dark theme matching Tactacam branding.
+ * @author Blane Maher
+ *
+ * Full-page dark theme matching TactaSuite branding.
  * Self-contained: includes all custom properties for independent rendering.
  */
 
@@ -653,21 +655,8 @@ body {
 
 
 /* ════════════════════════════════════════════════════════════════════
-   AI SETTINGS
+   FORM CONTROLS
    ════════════════════════════════════════════════════════════════════ */
-
-.tacta-opt-api-key-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 320px;
-}
-
-.tacta-opt-api-key-row .tacta-opt-input {
-    flex: 1;
-    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
-    font-size: 12px;
-}
 
 .tacta-opt-select {
     width: 320px;

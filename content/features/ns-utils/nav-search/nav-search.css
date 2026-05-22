@@ -1,6 +1,8 @@
 /**
  * nav-search.css
- * Tactacam NS Toolkit — Navigation Search Overlay Styles
+ * TactaSuite NS Toolkit — Navigation Search Overlay Styles
+ *
+ * @author Blane Maher
  *
  * All rules scoped under .tacta-nav-search to avoid NetSuite collisions.
  * Uses CSS custom properties from theme-vars.css (--tacta-*).

@@ -1,6 +1,8 @@
 /**
  * script-explorer.js
- * Tactacam NS Toolkit - Script Explorer (Content Script)
+ * TactaSuite NS Toolkit - Script Explorer (Content Script)
+ *
+ * @author Blane Maher
  *
  * Provides a browsable panel of all scripts and deployments in the
  * NetSuite account. Fetches data via SuiteQL through the background
@@ -10,7 +12,7 @@
  * Activation: popup message dispatches 'tacta:featureActivated' event
  * with featureId 'script-explorer'.
  *
- * @fileoverview Script Explorer content script for the Tactacam NS Toolkit.
+ * @fileoverview Script Explorer content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';

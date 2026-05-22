@@ -1,6 +1,8 @@
 /**
  * field-finder.js
- * Tactacam NS Toolkit - Field Finder (PAGE WORLD script)
+ * TactaSuite NS Toolkit - Field Finder (PAGE WORLD script)
+ *
+ * @author Blane Maher
  *
  * Enhances NetSuite's field dropdown selectors on Saved Search pages
  * with a filter textbox, field ID / type columns, and category filter
@@ -9,8 +11,6 @@
  * Runs in the PAGE world (MAIN) so it can access NetSuite's internal
  * `dropdowns` and `machines` objects. Injected via <script> tag from
  * the content script or via chrome.scripting.executeScript.
- *
- * Modeled after NetSuite Field Finder 0.35 by npehdolgmmdncpmkoploaeljhkngjbne.
  */
 (function () {
     'use strict';
@@ -211,14 +211,16 @@
         if (!hasRelated) buttons['Related'].style.display = 'none';
         if (!hasFormula) buttons['Formula'].style.display = 'none';
 
-        // Position all ID overlays to align with their option rows
+        // Position all ID overlays to align with their option rows.
+        // Use offsetTop (unscrolled coords) — getBoundingClientRect is viewport-
+        // relative, so when dd.div was scrolled the overlay's `top` got the scroll
+        // baked in once, and the scrolling container subtracted it again, leaving
+        // overlays one row above their option.
         function positionIdOverlays() {
-            var ddRect = dd.div.getBoundingClientRect();
             for (var j = 0; j < options.length; j++) {
                 var opt = options[j];
                 if (!opt.idOverlay || opt.hidden) continue;
-                var optRect = opt.el.getBoundingClientRect();
-                opt.idOverlay.style.top = (optRect.top - ddRect.top) + 'px';
+                opt.idOverlay.style.top = opt.el.offsetTop + 'px';
             }
         }
 

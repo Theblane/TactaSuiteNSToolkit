@@ -1,6 +1,8 @@
 /**
  * popup.js
- * Tactacam NS Toolkit — Popup Controller
+ * TactaSuite NS Toolkit — Popup Controller
+ *
+ * @author Blane Maher
  *
  * Manages the extension popup: environment detection, quick actions,
  * feature toggles, meeting mode, and active-feature display.
@@ -220,7 +222,18 @@
     /* ── Quick Actions ────────────────────────────────────────────── */
 
     function handleQuickAction(actionId) {
-        if (meetingMode || !currentTabId || featureStates[actionId] !== true) return;
+        if (meetingMode) {
+            showPopupError('Meeting mode is enabled — toggle it off to use features.');
+            return;
+        }
+        if (!currentTabId) {
+            showPopupError('No active tab detected.');
+            return;
+        }
+        if (featureStates[actionId] !== true) {
+            showPopupError('"' + actionId + '" is disabled. Enable it below or switch to Developer mode.');
+            return;
+        }
 
         sendMessage({
             action:    'executeFeature',
@@ -230,7 +243,21 @@
             window.close();
         }).catch((err) => {
             console.error('[Popup] Quick action failed:', err);
+            showPopupError('Quick action failed: ' + (err && err.message ? err.message : String(err)));
         });
+    }
+
+    function showPopupError(message) {
+        var existing = document.querySelector('.tacta-popup-error');
+        if (existing) existing.remove();
+        var bar = document.createElement('div');
+        bar.className = 'tacta-popup-error';
+        bar.textContent = message;
+        bar.style.cssText = 'position:fixed;left:8px;right:8px;bottom:36px;padding:8px 10px;' +
+            'background:#3a1a1a;color:#ff8888;border:1px solid #6a2a2a;border-radius:4px;' +
+            'font-size:11px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+        document.body.appendChild(bar);
+        setTimeout(function () { if (bar.parentNode) bar.remove(); }, 4000);
     }
 
 

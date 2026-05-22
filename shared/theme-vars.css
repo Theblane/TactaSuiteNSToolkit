@@ -1,8 +1,10 @@
 /**
  * theme-vars.css
- * Tactacam NS Toolkit - CSS Custom Properties
+ * TactaSuite NS Toolkit - CSS Custom Properties
  *
- * Defines the complete Tactacam dark theme as CSS custom properties.
+ * @author Blane Maher
+ *
+ * Defines the complete TactaSuite dark theme as CSS custom properties.
  * All variables use the --tacta- prefix to avoid collisions with
  * NetSuite or other extensions.
  *

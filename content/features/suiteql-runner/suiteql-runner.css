@@ -1,9 +1,10 @@
 /**
  * suiteql-runner.css
- * Tactacam NS Toolkit - SuiteQL Runner Styles
+ * TactaSuite NS Toolkit - SuiteQL Runner Styles
  *
- * Floating resizable panel for running SuiteQL queries and building
- * saved searches with AI assistance.
+ * @author Blane Maher
+ *
+ * Floating resizable panel for running SuiteQL queries.
  *
  * Scoped under .tacta-suiteql-runner to avoid collisions.
  * Uses CSS custom properties from theme-vars.css (--tacta-*).
@@ -139,7 +140,7 @@
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   TOOLBAR (Run button, AI Assist toggle, status)
+   TOOLBAR (Run button, history, status)
    ════════════════════════════════════════════════════════════════════ */
 
 .tacta-suiteql-runner .tacta-sql-toolbar {
@@ -246,110 +247,6 @@
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   AI ASSIST SECTION
-   ════════════════════════════════════════════════════════════════════ */
-
-.tacta-suiteql-runner .tacta-sql-ai-section {
-    margin-top: var(--tacta-space-sm);
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    background: var(--tacta-bg-elevated);
-    border: 1px solid var(--tacta-border);
-    border-radius: var(--tacta-radius-md);
-    overflow: hidden;
-    transition: max-height var(--tacta-transition-normal);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-section.tacta-collapsed .tacta-sql-ai-body {
-    display: none;
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    user-select: none;
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-header-title {
-    font-size: var(--tacta-font-size-sm);
-    font-weight: 600;
-    color: var(--tacta-text-secondary);
-    display: flex;
-    align-items: center;
-    gap: var(--tacta-space-xs);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-arrow {
-    font-size: 10px;
-    color: var(--tacta-text-muted);
-    transition: transform var(--tacta-transition-fast);
-    display: inline-block;
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-section:not(.tacta-collapsed) .tacta-sql-ai-arrow {
-    transform: rotate(90deg);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-body {
-    margin-top: var(--tacta-space-sm);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-input {
-    width: 100%;
-    min-height: 44px;
-    max-height: 100px;
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    font-family: var(--tacta-font-family);
-    font-size: var(--tacta-font-size-sm);
-    color: var(--tacta-text);
-    background: var(--tacta-bg);
-    border: 1px solid var(--tacta-border);
-    border-radius: var(--tacta-radius-md);
-    resize: vertical;
-    outline: none;
-    transition: border-color var(--tacta-transition-fast),
-                box-shadow var(--tacta-transition-fast);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-input:focus {
-    border-color: var(--tacta-accent);
-    box-shadow: 0 0 0 3px var(--tacta-accent-muted);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-input::placeholder {
-    color: var(--tacta-text-muted);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--tacta-space-sm);
-    margin-top: var(--tacta-space-sm);
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-explanation {
-    margin-top: var(--tacta-space-sm);
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    font-size: var(--tacta-font-size-xs);
-    color: var(--tacta-text-secondary);
-    background: var(--tacta-bg);
-    border-left: 3px solid var(--tacta-info);
-    border-radius: var(--tacta-radius-sm);
-    line-height: 1.5;
-}
-
-.tacta-suiteql-runner .tacta-sql-ai-nocfg {
-    margin-top: var(--tacta-space-sm);
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    font-size: var(--tacta-font-size-xs);
-    color: var(--tacta-warning);
-    background: var(--tacta-warning-bg);
-    border-radius: var(--tacta-radius-sm);
-    line-height: 1.5;
-}
-
-/* ════════════════════════════════════════════════════════════════════
    RESULTS TABLE
    ════════════════════════════════════════════════════════════════════ */
 
@@ -412,163 +309,6 @@
     line-height: 1.5;
     margin-top: var(--tacta-space-sm);
     word-break: break-word;
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   SAVED SEARCH BUILDER
-   ════════════════════════════════════════════════════════════════════ */
-
-.tacta-suiteql-runner .tacta-ss-builder {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-}
-
-.tacta-suiteql-runner .tacta-ss-prompt {
-    width: 100%;
-    min-height: 60px;
-    max-height: 120px;
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    font-family: var(--tacta-font-family);
-    font-size: var(--tacta-font-size-sm);
-    color: var(--tacta-text);
-    background: var(--tacta-bg-elevated);
-    border: 1px solid var(--tacta-border);
-    border-radius: var(--tacta-radius-md);
-    resize: vertical;
-    outline: none;
-    transition: border-color var(--tacta-transition-fast),
-                box-shadow var(--tacta-transition-fast);
-}
-
-.tacta-suiteql-runner .tacta-ss-prompt:focus {
-    border-color: var(--tacta-accent);
-    box-shadow: 0 0 0 3px var(--tacta-accent-muted);
-}
-
-.tacta-suiteql-runner .tacta-ss-prompt::placeholder {
-    color: var(--tacta-text-muted);
-}
-
-.tacta-suiteql-runner .tacta-ss-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--tacta-space-sm);
-    margin-top: var(--tacta-space-sm);
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   SEARCH DEFINITION DISPLAY
-   ════════════════════════════════════════════════════════════════════ */
-
-.tacta-suiteql-runner .tacta-ss-definition {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    margin-top: var(--tacta-space-sm);
-    overflow: hidden;
-    min-height: 0;
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-summary {
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    background: var(--tacta-bg-elevated);
-    border: 1px solid var(--tacta-border);
-    border-radius: var(--tacta-radius-md);
-    margin-bottom: var(--tacta-space-sm);
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-summary-row {
-    display: flex;
-    gap: var(--tacta-space-sm);
-    padding: var(--tacta-space-xxs) 0;
-    font-size: var(--tacta-font-size-sm);
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-label {
-    font-weight: 600;
-    color: var(--tacta-text-muted);
-    white-space: nowrap;
-    flex-shrink: 0;
-    min-width: 70px;
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-value {
-    color: var(--tacta-text-secondary);
-    font-family: var(--tacta-font-mono);
-    font-size: var(--tacta-font-size-xs);
-    word-break: break-word;
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-json {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-json .tacta-code {
-    min-height: 60px;
-    max-height: 200px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.tacta-suiteql-runner .tacta-ss-definition-json textarea.tacta-sql-editor {
-    min-height: 80px;
-    max-height: 200px;
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   SAVE ROW
-   ════════════════════════════════════════════════════════════════════ */
-
-.tacta-suiteql-runner .tacta-ss-save-row {
-    display: flex;
-    align-items: center;
-    gap: var(--tacta-space-sm);
-    margin-top: var(--tacta-space-sm);
-    flex-shrink: 0;
-}
-
-.tacta-suiteql-runner .tacta-ss-save-row .tacta-input {
-    flex: 1;
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   SAVED SEARCH RESULTS (PREVIEW)
-   ════════════════════════════════════════════════════════════════════ */
-
-.tacta-suiteql-runner .tacta-ss-results {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    margin-top: var(--tacta-space-sm);
-    overflow: hidden;
-    min-height: 0;
-}
-
-.tacta-suiteql-runner .tacta-ss-results .tacta-table-wrapper {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   AI EXPLANATION (Saved Search tab)
-   ════════════════════════════════════════════════════════════════════ */
-
-.tacta-suiteql-runner .tacta-ss-explanation {
-    margin-top: var(--tacta-space-sm);
-    padding: var(--tacta-space-sm) var(--tacta-space-md);
-    font-size: var(--tacta-font-size-xs);
-    color: var(--tacta-text-secondary);
-    background: var(--tacta-bg);
-    border-left: 3px solid var(--tacta-info);
-    border-radius: var(--tacta-radius-sm);
-    line-height: 1.5;
 }
 
 /* ════════════════════════════════════════════════════════════════════

@@ -1,6 +1,8 @@
 /**
  * field-help.css
- * Tactacam NS Toolkit — Field Help Tooltip Styles
+ * TactaSuite NS Toolkit — Field Help Tooltip Styles
+ *
+ * @author Blane Maher
  *
  * All rules scoped under .tacta-field-help to avoid NetSuite collisions.
  * Uses CSS custom properties from theme-vars.css (--tacta-*).

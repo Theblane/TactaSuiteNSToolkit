@@ -1,5 +1,7 @@
 /**
- * Tactacam NS Toolkit - Content Script Router
+ * TactaSuite NS Toolkit - Content Script Router
+ *
+ * @author Blane Maher
  *
  * Runtime router for auto and on-demand feature activation. Feature metadata
  * comes from the background registry so file paths and page rules do not drift

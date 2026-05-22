@@ -1,6 +1,8 @@
 /**
  * quick-search-creation.js
- * Tactacam NS Toolkit - Quick Search (Real-Time Global Record Search)
+ * TactaSuite NS Toolkit - Quick Search (Real-Time Global Record Search)
+ *
+ * @author Blane Maher
  *
  * Small circular icon next to NetSuite's search bar that expands into an
  * overlay search box. The user types text and sees matching records from
@@ -11,7 +13,7 @@
  * Secondary "Create new search" links are shown at the bottom of results
  * to preserve the original functionality.
  *
- * @fileoverview Quick Search content script for the Tactacam NS Toolkit.
+ * @fileoverview Quick Search content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';
@@ -516,6 +518,7 @@
         _isOpen = true;
         if (_wrapperEl) {
             _wrapperEl.classList.add('tacta-qsc-open');
+            _positionFloatingWrapper();
         }
         if (_inputEl) {
             setTimeout(function () { _inputEl.focus(); }, 60);
@@ -530,6 +533,7 @@
         _isOpen = false;
         if (_wrapperEl) {
             _wrapperEl.classList.remove('tacta-qsc-open');
+            _positionFloatingWrapper();
         }
         if (_dropdownEl) {
             _dropdownEl.classList.remove('tacta-qsc-dropdown-visible');
@@ -548,25 +552,137 @@
      * @returns {HTMLElement|null}
      */
     function _findNsSearchBar() {
-        var selectors = [
+        var inputSelectors = [
+            'input[type="search"]',
+            '#_searchstring',
+            'input[name="_searchstring"]',
+            'input[id*="search" i]',
+            'input[name*="search" i]',
+            'input[placeholder*="search" i]',
+            'input[aria-label*="search" i]',
+            'input[title*="search" i]'
+        ];
+
+        for (var i = 0; i < inputSelectors.length; i++) {
+            var matches = document.querySelectorAll(inputSelectors[i]);
+            for (var j = 0; j < matches.length; j++) {
+                var el = matches[j];
+                if (el && el.tagName === 'INPUT' && _isVisibleSearchCandidate(el)) {
+                    return el;
+                }
+            }
+        }
+
+        var containerSelectors = [
             '#ns-header-searcher-container',
             '#spn_cIS_d1',
-            '.ns-role-header .ns-search',
-            '#_searchstring',
-            'input[name="_searchstring"]'
+            '.ns-role-header .ns-search'
+        ];
+
+        for (var k = 0; k < containerSelectors.length; k++) {
+            var container = document.querySelector(containerSelectors[k]);
+            if (!container) continue;
+            var inputs = container.querySelectorAll('input');
+            for (var n = 0; n < inputs.length; n++) {
+                if (_isVisibleSearchCandidate(inputs[n])) return inputs[n];
+            }
+        }
+
+        return null;
+    }
+
+    function _isVisibleSearchCandidate(el) {
+        if (!el || el.id === 'tacta-qsc-input' || (el.closest && el.closest('#' + WRAPPER_ID))) return false;
+
+        var searchText = [
+            el.id,
+            el.name,
+            el.placeholder,
+            el.getAttribute && el.getAttribute('aria-label'),
+            el.title,
+            el.className
+        ].join(' ').toLowerCase();
+
+        if (searchText.indexOf('search') === -1 && searchText.indexOf('_searchstring') === -1) return false;
+
+        var rect = el.getBoundingClientRect();
+        if (!rect || rect.width < 80 || rect.height < 12) return false;
+        if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= window.innerHeight || rect.left >= window.innerWidth) return false;
+
+        var style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    }
+
+    /**
+     * Finds a stable header-level container for NetSuite's native search so
+     * the quick search icon sits to the left of the whole native search bar.
+     * @param {HTMLElement} el
+     * @returns {HTMLElement}
+     */
+    function _getSearchInsertTarget(el) {
+        var current = el;
+        var stop = document.body;
+
+        while (current && current.parentElement && current.parentElement !== stop) {
+            if (current.id === 'ns-header-searcher-container' ||
+                current.id === 'spn_cIS_d1' ||
+                _hasClass(current, 'ns-search')) {
+                return current;
+            }
+
+            if (current.tagName === 'FORM') {
+                return current;
+            }
+
+            if (current.parentElement && current.parentElement.querySelectorAll &&
+                current.parentElement.querySelectorAll('input').length > 1) {
+                return current;
+            }
+
+            current = current.parentElement;
+        }
+
+        return el.parentElement || el;
+    }
+
+    function _hasClass(el, className) {
+        return !!(el && el.classList && el.classList.contains(className));
+    }
+
+    /**
+     * Finds the header logo block so Quick Search can sit immediately after it.
+     * @returns {HTMLElement|null}
+     */
+    function _findCompanyLogoAnchor() {
+        var selectors = [
+            '#ns-header-logo',
+            '#nslogo',
+            '.ns-header-logo',
+            '.ns-logo',
+            'a[href*="/app/center/card.nl"] img',
+            'img[src*="logo"]'
         ];
 
         for (var i = 0; i < selectors.length; i++) {
             var el = document.querySelector(selectors[i]);
-            if (el) {
-                // If we found the input itself, return its parent container
-                if (el.tagName === 'INPUT') {
-                    return el.parentElement;
-                }
-                return el;
-            }
+            if (!el) continue;
+            return _getLogoInsertAnchor(el);
         }
+
         return null;
+    }
+
+    function _getLogoInsertAnchor(el) {
+        var link = el.closest && el.closest('a');
+        if (link && link.parentNode) return link;
+
+        var cell = el.closest && el.closest('td, li');
+        if (cell && cell.parentNode) return cell;
+
+        var block = el.closest && el.closest('div');
+        if (block && block.parentNode) return block;
+
+        return el;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -588,7 +704,7 @@
         // ── Icon button (always visible when collapsed) ──
         var iconBtn = document.createElement('button');
         iconBtn.className = 'tacta-qsc-icon';
-        iconBtn.title = 'Quick Search (Tactacam Toolkit)';
+        iconBtn.title = 'Quick Search (TactaSuite Toolkit)';
         iconBtn.type = 'button';
         iconBtn.innerHTML = MAGNIFIER_SVG;
         iconBtn.addEventListener('click', function (e) {
@@ -687,21 +803,45 @@
     }
 
     /**
-     * Inserts the wrapper element into the page, next to the NS search bar.
-     * Falls back to fixed position in the top-right if NS search cannot be found.
+     * Inserts the wrapper as a floating body-level control. Positioning is
+     * calculated from NetSuite's native search bar so we do not disturb the
+     * header/menu layout.
      * @param {HTMLElement} wrapper
      */
     function _insertIntoPage(wrapper) {
-        var nsSearch = _findNsSearchBar();
+        wrapper.classList.add('tacta-qsc-floating');
+        document.body.appendChild(wrapper);
+        _positionFloatingWrapper();
+        window.addEventListener('resize', _positionFloatingWrapper);
+        window.addEventListener('scroll', _positionFloatingWrapper, true);
+    }
 
-        if (nsSearch) {
-            // Insert our wrapper just before the NS search container
-            nsSearch.parentNode.insertBefore(wrapper, nsSearch);
-        } else {
-            // Fallback: fixed position in the top-right area
-            wrapper.classList.add('tacta-qsc-fixed');
-            document.body.appendChild(wrapper);
+    function _positionFloatingWrapper() {
+        if (!_wrapperEl) return;
+
+        var anchor = _findNsSearchBar() || _findCompanyLogoAnchor();
+        if (!anchor) {
+            _wrapperEl.classList.add('tacta-qsc-unplaced');
+            return;
         }
+
+        var rect = anchor.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+            _wrapperEl.classList.add('tacta-qsc-unplaced');
+            return;
+        }
+
+        _wrapperEl.classList.remove('tacta-qsc-unplaced');
+
+        var collapsedWidth = 30;
+        var expandedWidth = Math.min(500, Math.max(320, window.innerWidth - 32));
+        var width = _isOpen ? expandedWidth : collapsedWidth;
+        var gap = 8;
+        var left = Math.max(8, rect.left - width - gap);
+        var top = Math.max(4, rect.top + (rect.height / 2) - 15);
+
+        _wrapperEl.style.left = Math.round(left) + 'px';
+        _wrapperEl.style.top = Math.round(top) + 'px';
     }
 
     // ────────────────────────────────────────────────────────────────

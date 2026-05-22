@@ -1,6 +1,8 @@
 /**
  * account-color.js
- * Tactacam NS Toolkit - Account Color (Content Script, Auto-Trigger)
+ * TactaSuite NS Toolkit - Account Color (Content Script, Auto-Trigger)
+ *
+ * @author Blane Maher
  *
  * Adds a colored top border bar and environment badge to NetSuite pages
  * to visually distinguish Production from Sandbox environments.
@@ -16,7 +18,7 @@
  *
  * Dismissible per session via sessionStorage.
  *
- * @fileoverview Account Color content script for the Tactacam NS Toolkit.
+ * @fileoverview Account Color content script for the TactaSuite NS Toolkit.
  */
 (function () {
     'use strict';
