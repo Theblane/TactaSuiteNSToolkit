@@ -51,6 +51,32 @@
     /** @type {string|null} Currently expanded field ID */
     var _expandedFieldId = null;
 
+    function _errorText(err) {
+        var parts = [];
+        try {
+            if (err && err.message) parts.push(err.message);
+        } catch (_) {}
+        try {
+            parts.push(String(err || ''));
+        } catch (_) {}
+        return parts.join(' ');
+    }
+
+    function _isExtensionContextInvalidated(err) {
+        return /extension context invalidated|extension was reloaded/i.test(_errorText(err));
+    }
+
+    function _safeRuntimeUrl(path) {
+        try {
+            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+                return chrome.runtime.getURL(path);
+            }
+        } catch (err) {
+            if (!_isExtensionContextInvalidated(err)) throw err;
+        }
+        return '';
+    }
+
     // ────────────────────────────────────────────────────────────────
     // Service worker communication
     // ────────────────────────────────────────────────────────────────
@@ -67,7 +93,7 @@
                 chrome.runtime.sendMessage(payload, function (response) {
                     if (chrome.runtime.lastError) {
                         var msg = chrome.runtime.lastError.message || '';
-                        if (msg.indexOf('Extension context invalidated') >= 0) {
+                        if (_isExtensionContextInvalidated(msg)) {
                             reject(new Error('Extension was reloaded. Please refresh this page (F5) to reconnect.'));
                         } else {
                             reject(new Error(msg));
@@ -81,7 +107,7 @@
                     }
                 });
             } catch (e) {
-                if (String(e).indexOf('Extension context invalidated') >= 0) {
+                if (_isExtensionContextInvalidated(e)) {
                     reject(new Error('Extension was reloaded. Please refresh this page (F5) to reconnect.'));
                 } else {
                     reject(e);
@@ -172,6 +198,51 @@
             });
     }
 
+    function _cleanFieldLabel(text) {
+        return String(text || '').replace(/\s+/g, ' ').replace(/[*:]\s*$/g, '').trim();
+    }
+
+    function _fieldDomIdCandidates(fieldId) {
+        var ids = [
+            fieldId,
+            fieldId + '_display',
+            fieldId + '_val',
+            fieldId + '_fs_lbl',
+            fieldId + '_lbl',
+            fieldId + '_label',
+            fieldId + '_fs',
+            'inpt_' + fieldId
+        ];
+        if (fieldId && fieldId.charAt(fieldId.length - 1) === '_') {
+            var trimmed = fieldId.slice(0, -1);
+            ids.push(trimmed + '_display', trimmed + '_val', trimmed + '_fs_lbl', trimmed + '_lbl', trimmed + '_label', trimmed + '_fs');
+        }
+        return ids;
+    }
+
+    function _getDomFieldLabel(fieldId) {
+        var ids = _fieldDomIdCandidates(fieldId);
+        for (var i = 0; i < ids.length; i++) {
+            var labelEl = document.getElementById(ids[i] + '_fs_lbl') ||
+                document.getElementById(ids[i] + '_lbl') ||
+                document.querySelector('label[for="' + ids[i] + '"]');
+            if (labelEl) {
+                var label = _cleanFieldLabel(labelEl.textContent);
+                if (label) return label;
+            }
+        }
+        for (var j = 0; j < ids.length; j++) {
+            var el = document.getElementById(ids[j]);
+            if (!el) continue;
+            var row = el.closest('tr, .uir-field-wrapper, .uir-field');
+            if (!row) continue;
+            var candidate = row.querySelector('.smalltextnolink, .smalltext, .uir-label span, .uir-label, label');
+            var rowLabel = candidate ? _cleanFieldLabel(candidate.textContent) : '';
+            if (rowLabel) return rowLabel;
+        }
+        return '';
+    }
+
     /**
      * Merges XML-fetched field data into the API result.
      * Adds any fields found in XML that aren't already in the API data.
@@ -196,12 +267,15 @@
                     if (apiData.bodyFields[eb].id === key && apiData.bodyFields[eb].value === null) {
                         apiData.bodyFields[eb].value = xmlData.bodyFields[key];
                     }
+                    if (apiData.bodyFields[eb].id === key && !apiData.bodyFields[eb].label) {
+                        apiData.bodyFields[eb].label = _getDomFieldLabel(key);
+                    }
                 }
                 continue;
             }
             apiData.bodyFields.push({
                 id: key,
-                label: '',
+                label: _getDomFieldLabel(key),
                 type: 'unknown',
                 value: xmlData.bodyFields[key],
                 text: null,
@@ -272,15 +346,32 @@
                 return;
             }
 
+            // Detect NetSuite header height for positioning
+            var topOffset = '0';
+            var header = document.getElementById('ns-header') || document.querySelector('.uir-header');
+            if (header) {
+                topOffset = header.offsetHeight + 'px';
+            }
+
             // Inject feature CSS
             if (TactaDOM.injectStylesheet) {
-                TactaDOM.injectStylesheet(chrome.runtime.getURL('content/features/field-explorer/field-explorer.css'));
+                try {
+                    var cssUrl = _safeRuntimeUrl('content/features/field-explorer/field-explorer.css');
+                    if (cssUrl) {
+                        TactaDOM.injectStylesheet(cssUrl).catch(function () {});
+                    }
+                } catch (cssErr) {
+                    if (!_isExtensionContextInvalidated(cssErr)) throw cssErr;
+                    // If the unpacked extension was reloaded, keep the UI path alive;
+                    // background calls will fall back to XML and surface a refresh hint.
+                }
             }
 
             // Create sidebar
             _sidebarInstance = TactaDOM.createSidebar({
                 title: 'Field Explorer',
                 width: 420,
+                top: topOffset,
                 overlay: false,
                 onClose: function () {
                     _sidebarInstance = null;
@@ -306,12 +397,24 @@
                     _buildUI();
                 })
                 .catch(function (err) {
+                    if (_isExtensionContextInvalidated(err)) {
+                        _showError('Extension was reloaded. Refresh this NetSuite tab to reconnect Field Explorer.');
+                        return;
+                    }
                     _showError(err.message || 'Failed to load field data.');
                 });
         } catch (e) {
+            var message = _errorText(e) || 'Unknown error';
+            if (_isExtensionContextInvalidated(e)) {
+                console.warn('[TactaFE] Extension context invalidated. Refresh the NetSuite tab to reconnect Field Explorer.');
+                if (_sidebarInstance && _sidebarInstance.body) {
+                    _showError('Extension was reloaded. Refresh this NetSuite tab to reconnect Field Explorer.');
+                }
+                return;
+            }
             console.error('[TactaFE] activate() threw:', e);
             if (typeof TactaDOM !== 'undefined' && TactaDOM.showToast) {
-                TactaDOM.showToast('Field Explorer failed to open: ' + (e.message || e), 'error', 4000);
+                TactaDOM.showToast('Field Explorer failed to open: ' + message, 'error', 4000);
             }
         }
     }
@@ -517,8 +620,9 @@
      * Renders the filtered/searched field list into the container.
      */
     function _renderFieldList() {
-        var container = document.getElementById('tacta-fe-field-list');
-        if (!container || !_fieldData) return;
+        if (!_sidebarInstance || !_fieldData) return;
+        var container = _sidebarInstance.body.querySelector('#tacta-fe-field-list');
+        if (!container) return;
         container.innerHTML = '';
 
         var fields = _getFilteredFields();
@@ -612,8 +716,25 @@
             dataset: { fieldId: field.id || '' }
         });
 
-        // Header row: field ID + type badge
-        var fieldIdEl = TactaDOM.createElement('span', {
+        var fieldName = field.label || field.id || '(unknown)';
+
+        var fieldNameEl = TactaDOM.createElement('span', {
+            className: 'tacta-fe-card-name',
+            textContent: fieldName
+        });
+
+        var typeBadge = TactaDOM.createElement('span', {
+            className: 'tacta-fe-card-type',
+            textContent: field.type || 'unknown'
+        });
+
+        var headerRow = TactaDOM.createElement('div', {
+            className: 'tacta-fe-card-header'
+        }, [fieldNameEl, typeBadge]);
+
+        card.appendChild(headerRow);
+
+        var fieldIdEl = TactaDOM.createElement('div', {
             className: 'tacta-fe-card-id',
             textContent: field.id || '(unknown)',
             title: 'Click to copy field ID',
@@ -627,24 +748,7 @@
             }
         });
 
-        var typeBadge = TactaDOM.createElement('span', {
-            className: 'tacta-fe-card-type',
-            textContent: field.type || 'unknown'
-        });
-
-        var headerRow = TactaDOM.createElement('div', {
-            className: 'tacta-fe-card-header'
-        }, [fieldIdEl, typeBadge]);
-
-        card.appendChild(headerRow);
-
-        // Label row
-        if (field.label) {
-            card.appendChild(TactaDOM.createElement('div', {
-                className: 'tacta-fe-card-label',
-                textContent: field.label
-            }));
-        }
+        card.appendChild(fieldIdEl);
 
         // Value row
         var displayValue = _formatDisplayValue(field.value, field.text);
@@ -1206,12 +1310,16 @@
     /**
      * Also listen for direct chrome.runtime messages from the popup.
      */
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-        chrome.runtime.onMessage.addListener(function (message) {
-            if (message.action === 'activateFeature' && message.featureId === 'field-explorer') {
-                activate();
-            }
-        });
+    try {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+            chrome.runtime.onMessage.addListener(function (message) {
+                if (message.action === 'activateFeature' && message.featureId === 'field-explorer') {
+                    activate();
+                }
+            });
+        }
+    } catch (err) {
+        if (!_isExtensionContextInvalidated(err)) throw err;
     }
 
 })();

@@ -213,7 +213,7 @@
 }
 
 /* Disabled */
-.tacta-field-explorer .tacta-fe-card--disabled .tacta-fe-card-label {
+.tacta-field-explorer .tacta-fe-card--disabled .tacta-fe-card-name {
     text-decoration: line-through;
     color: var(--tacta-text-muted);
 }
@@ -227,17 +227,27 @@
     margin-bottom: var(--tacta-space-xxs);
 }
 
+.tacta-field-explorer .tacta-fe-card-name {
+    min-width: 0;
+    flex: 1;
+    font-size: var(--tacta-font-size-md);
+    font-weight: 600;
+    color: var(--tacta-text);
+    word-break: break-word;
+}
+
 .tacta-field-explorer .tacta-fe-card-id {
+    margin-bottom: var(--tacta-space-xxs);
     font-family: var(--tacta-font-mono);
-    font-size: var(--tacta-font-size-sm);
-    color: var(--tacta-accent);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-secondary);
     cursor: pointer;
     word-break: break-all;
     transition: color 120ms ease;
 }
 
 .tacta-field-explorer .tacta-fe-card-id:hover {
-    color: var(--tacta-accent-hover);
+    color: var(--tacta-accent);
     text-decoration: underline;
 }
 

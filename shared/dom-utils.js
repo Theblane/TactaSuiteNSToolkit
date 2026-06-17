@@ -32,38 +32,75 @@
     }
 
     /**
+     * Internal state for Shadow DOM isolation.
+     * @type {ShadowRoot|null}
+     */
+    var _shadowRoot = null;
+
+    /**
+     * Internal state for the UI wrapper within the Shadow DOM.
+     * @type {HTMLElement|null}
+     */
+    var _shadowWrapper = null;
+
+    /**
      * Returns or creates the singleton toast container element.
      * @returns {HTMLElement}
      */
     function _getToastContainer() {
-        var existing = document.querySelector('.tacta-toolkit .tacta-toast-container');
+        var root = _ensureRoot();
+        var existing = root.querySelector('.tacta-toast-container');
         if (existing) return existing;
-
-        var wrapper = document.querySelector('.tacta-toolkit');
-        if (!wrapper) {
-            wrapper = document.createElement('div');
-            wrapper.className = 'tacta-toolkit';
-            document.body.appendChild(wrapper);
-        }
 
         var container = document.createElement('div');
         container.className = 'tacta-toast-container';
-        wrapper.appendChild(container);
+        root.appendChild(container);
         return container;
     }
 
     /**
-     * Ensures a .tacta-toolkit wrapper exists in the DOM and returns it.
+     * Ensures a Shadow DOM host exists, attaches a Shadow Root if needed,
+     * and returns the internal .tacta-toolkit wrapper.
      * @returns {HTMLElement}
      */
     function _ensureRoot() {
-        var root = document.querySelector('.tacta-toolkit');
-        if (!root) {
-            root = document.createElement('div');
-            root.className = 'tacta-toolkit';
-            document.body.appendChild(root);
+        if (_shadowWrapper) return _shadowWrapper;
+
+        var host = document.querySelector('#tacta-toolkit-host');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'tacta-toolkit-host';
+            document.body.appendChild(host);
         }
-        return root;
+
+        if (!host.shadowRoot) {
+            _shadowRoot = host.attachShadow({ mode: 'open' });
+
+            // Inject primary styles into shadow root
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+                var styles = ['shared/theme-vars.css', 'shared/tactasuite-ui.css'];
+                for (var i = 0; i < styles.length; i++) {
+                    var link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = chrome.runtime.getURL(styles[i]);
+                    _shadowRoot.appendChild(link);
+                }
+            }
+
+            _shadowWrapper = document.createElement('div');
+            _shadowWrapper.className = 'tacta-toolkit';
+            _shadowRoot.appendChild(_shadowWrapper);
+        } else {
+            _shadowRoot = host.shadowRoot;
+            _shadowWrapper = _shadowRoot.querySelector('.tacta-toolkit');
+            if (!_shadowWrapper) {
+                _shadowWrapper = document.createElement('div');
+                _shadowWrapper.className = 'tacta-toolkit';
+                _shadowRoot.appendChild(_shadowWrapper);
+            }
+        }
+
+        return _shadowWrapper;
     }
 
     /**
@@ -366,7 +403,9 @@
                                 document.removeEventListener('mousedown', onClickOutside, true);
                                 return;
                             }
-                            if (!panel.contains(e.target)) {
+                            // Handle retargeting: use composedPath() to check if the click was inside the panel
+                            var path = e.composedPath();
+                            if (path.indexOf(panel) === -1) {
                                 document.removeEventListener('mousedown', onClickOutside, true);
                                 close();
                             }
@@ -613,9 +652,14 @@
             sidebarBody.appendChild(opts.content);
         }
 
+        var sidebarStyle = {
+            width: width,
+            top: opts.top || '0',
+            bottom: '0'
+        };
         var sidebar = createElement('div', {
             className: 'tacta-sidebar',
-            style: { width: width }
+            style: sidebarStyle
         }, [sidebarHeader, sidebarBody]);
 
         root.appendChild(sidebar);
@@ -910,8 +954,11 @@
      */
     function injectStylesheet(url) {
         return new Promise(function (resolve, reject) {
-            // Check for duplicate
-            if (document.querySelector('link[href="' + url + '"]')) {
+            var wrapper = _ensureRoot();
+            var shadow = wrapper.parentNode; // The ShadowRoot
+
+            // Check for duplicate in shadow root
+            if (shadow.querySelector('link[href="' + url + '"]')) {
                 resolve();
                 return;
             }
@@ -923,7 +970,9 @@
             link.addEventListener('error', function () {
                 reject(new Error('TactaDOM: Failed to load stylesheet: ' + url));
             });
-            (document.head || document.documentElement).appendChild(link);
+
+            // Insert before the wrapper to ensure styles are available for elements inside
+            shadow.insertBefore(link, wrapper);
         });
     }
 
@@ -933,6 +982,7 @@
 
     /** @namespace TactaDOM */
     var TactaDOM = {
+        getToolkitRoot: _ensureRoot,
         createPanel: createPanel,
         createModal: createModal,
         showToast: showToast,

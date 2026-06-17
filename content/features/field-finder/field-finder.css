@@ -77,6 +77,10 @@
 }
 
 /* Option columns */
+.tacta-ff-option-row {
+    box-sizing: border-box;
+}
+
 .tacta-ff-col {
     display: inline-block;
     vertical-align: middle;
@@ -88,7 +92,7 @@
 }
 
 .tacta-ff-col-name {
-    width: 300px;
+    width: 320px;
     font-weight: 500;
 }
 
@@ -101,18 +105,7 @@
 }
 
 /* ID overlay — positioned absolutely so it's outside the option's click target */
-.tacta-ff-id-overlay {
-    position: absolute;
-    left: 310px;
-    pointer-events: auto;
-    z-index: 10;
-    padding: 2px 4px;
-    border-radius: 2px;
-    transition: background 0.15s, color 0.15s;
-}
-
-.tacta-ff-col-id:hover,
-.tacta-ff-id-overlay:hover {
+.tacta-ff-col-id:hover {
     text-decoration: underline;
     color: #76c043;
     background: rgba(118, 192, 67, 0.1);
@@ -130,7 +123,7 @@
 }
 
 .tacta-ff-col-type {
-    width: 100px;
+    width: 130px;
     font-size: 10px;
     color: #888;
     font-style: italic;

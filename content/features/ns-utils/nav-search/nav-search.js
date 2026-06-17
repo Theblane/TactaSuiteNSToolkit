@@ -50,6 +50,9 @@
     // State
     // ────────────────────────────────────────────────────────────────
 
+    /** @type {ShadowRoot|null} Shadow Root for the overlay */
+    var _shadowRoot = null;
+
     /** @type {HTMLElement|null} Backdrop overlay element */
     var _backdrop = null;
 
@@ -360,6 +363,16 @@
             results.push(scored[m].page);
         }
 
+        // Add "Search NetSuite Records" option at the bottom if there is a query.
+        if (q.length > 0) {
+            results.push({
+                title: "Search records for '" + query + "'",
+                path: "/app/common/search/searchresults.nl?searchtype=Global&searchfor=" + encodeURIComponent(query),
+                category: "Global",
+                isGlobalSearch: true
+            });
+        }
+
         return results;
     }
 
@@ -383,6 +396,19 @@
      */
     function buildOverlay() {
         if (_backdrop) return; // Already built.
+
+        var host = document.createElement('div');
+        host.id = 'tacta-nav-search-host';
+        document.body.appendChild(host);
+
+        _shadowRoot = host.attachShadow({ mode: 'open' });
+
+        // Inject CSS into shadow root.
+        var cssUrl = chrome.runtime.getURL('content/features/ns-utils/nav-search/nav-search.css');
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = cssUrl;
+        _shadowRoot.appendChild(link);
 
         // Backdrop.
         _backdrop = document.createElement('div');
@@ -445,7 +471,7 @@
         _input.addEventListener('keydown', onInputKeyDown);
         _backdrop.addEventListener('click', onBackdropClick);
 
-        document.body.appendChild(_backdrop);
+        _shadowRoot.appendChild(_backdrop);
     }
 
     /**
@@ -710,6 +736,7 @@
 
     /**
      * Global keyboard shortcut handler: Ctrl+Shift+K (or Cmd+Shift+K on Mac).
+     * Also supports '/' to open search when not in an input.
      * @param {KeyboardEvent} event
      */
     function onGlobalKeyDown(event) {
@@ -719,10 +746,24 @@
             event.preventDefault();
             event.stopPropagation();
             toggleOverlay();
+            return;
         }
 
-        // Also close on Escape if the overlay is open (catches Escape
-        // even when the input doesn't have focus).
+        // '/' key shortcut (if not already focused in an input/textarea)
+        if (event.key === '/' && !_isOpen) {
+            var active = document.activeElement;
+            var isInput = active && (
+                active.tagName === 'INPUT' ||
+                active.tagName === 'TEXTAREA' ||
+                active.isContentEditable
+            );
+            if (!isInput) {
+                event.preventDefault();
+                openOverlay();
+            }
+        }
+
+        // Also close on Escape if the overlay is open.
         if (event.key === 'Escape' && _isOpen) {
             event.preventDefault();
             closeOverlay();
@@ -748,15 +789,6 @@
 
         // Attach global keyboard shortcut.
         document.addEventListener('keydown', onGlobalKeyDown, true);
-
-        // Inject CSS.
-        var cssUrl = chrome.runtime.getURL('content/features/ns-utils/nav-search/nav-search.css');
-        if (!document.querySelector('link[href="' + cssUrl + '"]')) {
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = cssUrl;
-            (document.head || document.documentElement).appendChild(link);
-        }
 
         console.log('[Tacta Toolkit] Navigation Search activated. Press ' +
                     (IS_MAC ? 'Cmd' : 'Ctrl') + '+Shift+K to open.');

@@ -238,6 +238,12 @@
     color: #888888;
 }
 
+.tacta-nav-search__badge--Global {
+    background: rgba(118, 192, 67, 0.12);
+    color: var(--tacta-accent, #76c043);
+    border: 1px solid rgba(118, 192, 67, 0.2);
+}
+
 /* ── Empty State ───────────────────────────────────────────────────── */
 
 .tacta-nav-search__empty {

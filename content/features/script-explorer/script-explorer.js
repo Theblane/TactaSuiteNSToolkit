@@ -120,6 +120,21 @@
         });
     }
 
+    function _rowValue(row, keys, index) {
+        if (!row) return '';
+        if (Array.isArray(row)) return row[index];
+        for (var i = 0; i < keys.length; i++) {
+            if (Object.prototype.hasOwnProperty.call(row, keys[i])) {
+                return row[keys[i]];
+            }
+        }
+        return '';
+    }
+
+    function _normalizeType(value) {
+        return String(value || '').trim().toUpperCase();
+    }
+
     // ────────────────────────────────────────────────────────────────
     // Data fetching
     // ────────────────────────────────────────────────────────────────
@@ -134,7 +149,12 @@
         }
 
         var query =
-            "SELECT s.id, s.name, s.scriptid, s.scripttype, s.description " +
+            "SELECT " +
+            "s.id AS id, " +
+            "s.name AS name, " +
+            "s.scriptid AS scriptid, " +
+            "s.scripttype AS scripttype, " +
+            "s.description AS description " +
             "FROM script s " +
             "ORDER BY s.name";
 
@@ -143,12 +163,14 @@
             if (response && response.rows) {
                 for (var i = 0; i < response.rows.length; i++) {
                     var row = response.rows[i];
+                    var id = _rowValue(row, ['id'], 0);
+                    var scriptid = _rowValue(row, ['scriptid', 'script_id'], 2);
                     scripts.push({
-                        id: row[0],
-                        name: row[1],
-                        scriptid: row[2],
-                        scripttype: row[3],
-                        description: row[4] || ''
+                        id: id,
+                        name: _rowValue(row, ['name'], 1),
+                        scriptid: scriptid,
+                        scripttype: _normalizeType(_rowValue(row, ['scripttype', 'script_type'], 3)),
+                        description: _rowValue(row, ['description'], 4) || ''
                     });
                 }
             }
@@ -169,7 +191,13 @@
         }
 
         var query =
-            "SELECT sd.scriptid, sd.recordtype, sd.status, sd.loglevel, sd.isdeployed " +
+            "SELECT " +
+            "sd.id AS id, " +
+            "sd.scriptid AS scriptid, " +
+            "sd.recordtype AS recordtype, " +
+            "sd.status AS status, " +
+            "sd.loglevel AS loglevel, " +
+            "sd.isdeployed AS isdeployed " +
             "FROM scriptdeployment sd " +
             "WHERE sd.script = " + scriptId;
 
@@ -179,11 +207,12 @@
                 for (var i = 0; i < response.rows.length; i++) {
                     var row = response.rows[i];
                     deployments.push({
-                        scriptid: row[0],
-                        recordtype: row[1] || '-',
-                        status: row[2] || 'Unknown',
-                        loglevel: row[3] || 'DEBUG',
-                        isdeployed: row[4]
+                        id: _rowValue(row, ['id'], 0),
+                        scriptid: _rowValue(row, ['scriptid'], 1),
+                        recordtype: _rowValue(row, ['recordtype'], 2) || '-',
+                        status: _rowValue(row, ['status'], 3) || 'Unknown',
+                        loglevel: _rowValue(row, ['loglevel'], 4) || 'DEBUG',
+                        isdeployed: _rowValue(row, ['isdeployed'], 5)
                     });
                 }
             }
@@ -201,7 +230,7 @@
         if (!scripts || scripts.length === 0) return Promise.resolve({});
 
         var query =
-            "SELECT sd.script, COUNT(*) as cnt " +
+            "SELECT sd.script AS script, COUNT(*) AS cnt " +
             "FROM scriptdeployment sd " +
             "GROUP BY sd.script";
 
@@ -209,7 +238,9 @@
             var counts = {};
             if (response && response.rows) {
                 for (var i = 0; i < response.rows.length; i++) {
-                    counts[response.rows[i][0]] = parseInt(response.rows[i][1], 10) || 0;
+                    var row = response.rows[i];
+                    var scriptId = _rowValue(row, ['script'], 0);
+                    counts[scriptId] = parseInt(_rowValue(row, ['cnt', 'count'], 1), 10) || 0;
                 }
             }
             return counts;
@@ -416,6 +447,14 @@
 
         var nameEl = _el('div', { className: SCOPE_CLASS + '-card-name', textContent: script.name || '(unnamed)' });
         var idEl = _el('div', { className: SCOPE_CLASS + '-card-id', textContent: script.scriptid || '' });
+        nameEl.title = 'Click to open script record';
+        nameEl.style.cursor = 'pointer';
+        nameEl.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (script.id) {
+                window.open('/app/common/scripting/script.nl?id=' + encodeURIComponent(script.id), '_blank');
+            }
+        });
 
         headerLeft.appendChild(nameEl);
         headerLeft.appendChild(idEl);
@@ -588,10 +627,9 @@
                 row.title = 'Click to open deployment record';
                 row.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    var url = '/app/common/scripting/scriptrecord.nl?scripttype=' +
-                              _getScriptTypeNum(script.scripttype) +
-                              '&id=' + script.id;
-                    window.open(url, '_blank');
+                    if (dep.id) {
+                        window.open('/app/common/scripting/scriptrecord.nl?id=' + encodeURIComponent(dep.id), '_blank');
+                    }
                 });
 
                 container.appendChild(row);

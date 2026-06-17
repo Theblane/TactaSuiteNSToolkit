@@ -448,32 +448,112 @@ function feGetRecordFieldsFn() {
       multiselect:'Multi-Select',radio:'Radio',inlinehtml:'Inline HTML',longtext:'Long Text'};
     return m[String(t).toLowerCase()] || t;
   }
+  function cleanLabel(text) {
+    return String(text || '').replace(/\s+/g, ' ').replace(/[*:]\s*$/g, '').trim();
+  }
+  function fieldDomIds(fid) {
+    const ids = [fid, fid + '_display', fid + '_val', fid + '_fs_lbl', fid + '_lbl', fid + '_label', fid + '_fs', 'inpt_' + fid];
+    if (fid && fid.charAt(fid.length - 1) === '_') {
+      const trimmed = fid.slice(0, -1);
+      ids.push(trimmed + '_display', trimmed + '_val', trimmed + '_fs_lbl', trimmed + '_lbl', trimmed + '_label', trimmed + '_fs');
+    }
+    return ids;
+  }
+  function normalizeBodyFieldId(id) {
+    if (!id) return '';
+    let fid = String(id);
+    if (fid.indexOf('inpt_') === 0) fid = fid.substring(5);
+    [
+      '_display',
+      '_fs_lbl',
+      '_label',
+      '_lbl',
+      '_help',
+      '_err',
+      '_popup_link',
+      '_popup',
+      '_arrow',
+      '_val',
+      '_fs',
+      '_hdn'
+    ].some((suffix) => {
+      if (fid.slice(-suffix.length) === suffix) {
+        fid = fid.slice(0, -suffix.length);
+        return true;
+      }
+      return false;
+    });
+    if (!fid || /^(sys_|__|submitter|wfSR|nsapiPI|nsapiFC|nsapiLC|nsapiPS|nsapiVF|nsapiRC|hddn|uir-)/.test(fid)) return '';
+    if (/row\d+$/.test(fid)) return '';
+    return fid;
+  }
+  function getDomFieldLabel(fid) {
+    const ids = fieldDomIds(fid);
+    for (let i = 0; i < ids.length; i++) {
+      const labelEl = document.getElementById(ids[i] + '_fs_lbl') ||
+        document.getElementById(ids[i] + '_lbl') ||
+        document.querySelector('label[for="' + ids[i] + '"]');
+      if (labelEl) {
+        const label = cleanLabel(labelEl.textContent);
+        if (label) return label;
+      }
+    }
+    for (let j = 0; j < ids.length; j++) {
+      const el = document.getElementById(ids[j]);
+      if (!el) continue;
+      const row = el.closest('tr, .uir-field-wrapper, .uir-field');
+      if (!row) continue;
+      const labelCandidate = row.querySelector('.smalltextnolink, .smalltext, .uir-label span, .uir-label, label');
+      const label = labelCandidate ? cleanLabel(labelCandidate.textContent) : '';
+      if (label) return label;
+    }
+    return '';
+  }
+  function getSS2CurrentRecord() {
+    try {
+      if (window.currentRecord && typeof window.currentRecord.getFields === 'function') return window.currentRecord;
+    } catch(_) {}
+    try {
+      if (typeof require === 'function') {
+        let record = null;
+        require(['N/currentRecord'], function (mod) {
+          try { record = mod && typeof mod.get === 'function' ? mod.get() : null; } catch(_) {}
+        });
+        if (record && typeof record.getFields === 'function') return record;
+      }
+    } catch(_) {}
+    return null;
+  }
   // Uses SuiteScript 1.0 globals (nlapiGetField, nlapiGetFieldValue) which are
   // always available on NS record pages — no require() needed. Same approach
   // as the NetSuite Advanced Field Help reference extension.
 
   const result = { bodyFields: [], sublists: {} };
+  const currentRecord = getSS2CurrentRecord();
 
   // Scan DOM for all field IDs
   const seen = {};
   const fieldIds = [];
-  const formEls = document.querySelectorAll('#main_form input[id], #main_form select[id], #main_form textarea[id]');
+  const formEls = document.querySelectorAll('#main_form [id]');
   for (let i = 0; i < formEls.length; i++) {
-    let id = formEls[i].id;
+    const rawId = formEls[i].id || '';
+    const tagName = String(formEls[i].tagName || '').toLowerCase();
+    const isFieldControl = tagName === 'input' || tagName === 'select' || tagName === 'textarea';
+    const isFieldDecoration = /(_display|_fs_lbl|_label|_lbl|_val|_fs)$/.test(rawId);
+    if (!isFieldControl && !isFieldDecoration) continue;
+
+    let id = normalizeBodyFieldId(rawId);
     if (!id || seen[id]) continue;
-    if (/^(sys_|__|submitter|wfSR|nsapiPI|nsapiFC|nsapiLC|nsapiPS|nsapiVF|nsapiRC|hddn|uir-)|_display$|_lbl$|_label$|_help$|_err$|_fs$|_popup|_arrow|_hdn$/.test(id)) continue;
-    if (/row\d+$/.test(id)) continue;
     // Skip sublist cells
     if (formEls[i].closest('.uir-machine-table-container, .uir-sublist')) continue;
-    if (seen[id]) continue;
     seen[id] = true;
     fieldIds.push(id);
   }
 
   // Also try SS2 getFields() if available (catches hidden fields not in DOM)
   try {
-    if (window.currentRecord && typeof window.currentRecord.getFields === 'function') {
-      const ss2Ids = window.currentRecord.getFields();
+    if (currentRecord && typeof currentRecord.getFields === 'function') {
+      const ss2Ids = currentRecord.getFields();
       for (let j = 0; j < ss2Ids.length; j++) {
         if (!seen[ss2Ids[j]]) { fieldIds.push(ss2Ids[j]); seen[ss2Ids[j]] = true; }
       }
@@ -496,6 +576,17 @@ function feGetRecordFieldsFn() {
           try { isMandatory = f.isMandatory ? f.isMandatory() : (f.required || false); } catch(_) {}
           try { isDisabled = f.isDisabled ? f.isDisabled() : (f.disabled || false); } catch(_) {}
           try { isHidden = f.isHidden ? f.isHidden() : false; } catch(_) {}
+        }
+      }
+    } catch(_) {}
+    try {
+      if ((!label || !type || type === 'unknown') && currentRecord && typeof currentRecord.getField === 'function') {
+        const f2 = currentRecord.getField({ fieldId: fid });
+        if (f2) {
+          if (!label) label = cleanLabel(f2.label || f2.name || '');
+          if (!type) type = f2.type || '';
+          if (!isMandatory && f2.isMandatory !== undefined) isMandatory = !!f2.isMandatory;
+          if (!isDisabled && f2.isDisabled !== undefined) isDisabled = !!f2.isDisabled;
         }
       }
     } catch(_) {}
@@ -528,7 +619,8 @@ function feGetRecordFieldsFn() {
     if (!isHidden || !isDisabled) {
       const el = document.getElementById(fid) || document.getElementById(fid + '_display')
                 || document.getElementById(fid + '_val') || document.getElementById(fid + '_fs_lbl')
-                || document.getElementById('inpt_' + fid);
+                || document.getElementById('inpt_' + fid)
+                || (fid.charAt(fid.length - 1) === '_' ? document.getElementById(fid.slice(0, -1) + '_val') || document.getElementById(fid.slice(0, -1) + '_fs_lbl') : null);
       if (el) {
         if (!isHidden) {
           const s = window.getComputedStyle(el);
@@ -559,12 +651,7 @@ function feGetRecordFieldsFn() {
 
     // DOM label fallback
     if (!label) {
-      const lbl = document.querySelector('label[for="' + fid + '"], label[for="' + fid + '_display"]');
-      if (lbl) label = (lbl.textContent || '').trim();
-      if (!label) {
-        const el2 = document.getElementById(fid) || document.getElementById(fid + '_display');
-        if (el2) { const row = el2.closest('tr'); if (row) { const lc = row.querySelector('.smalltextnolink, .smalltext, .uir-label span'); if (lc) label = (lc.textContent || '').trim(); } }
-      }
+      label = getDomFieldLabel(fid);
     }
 
     type = normType(type);

@@ -79,10 +79,63 @@
       return;
     }
 
+    // Inject CSS.
+    // Logic: If the CSS file is meant to style the NetSuite page itself,
+    // it MUST go into the document head. If it's for toolkit UI, it goes into Shadow Root.
+    if (feature.contentStyles && feature.contentStyles.length > 0) {
+      var globalStyles = [
+        'account-color.css',
+        'workflow-colors.css',
+        'fixed-headers.css',
+        'better-page-titles.css',
+        'field-finder.css',
+        'saved-search-export.css',
+        'quick-search-creation.css',
+        'suitescript-exporter.css',
+        'transaction-tree.css',
+        'field-help.css',
+        'pdf-tools.css',
+        'csv-viewer.css',
+        'split-view.css',
+        'script-content-search.css',
+        'script-analyzer.css'
+      ];
+      var shadowCss = [];
+      var headCss = [];
+
+      for (var i = 0; i < feature.contentStyles.length; i++) {
+        var path = feature.contentStyles[i];
+        var fileName = path.split('/').pop();
+        if (globalStyles.indexOf(fileName) !== -1) {
+          headCss.push(path);
+        } else {
+          shadowCss.push(path);
+        }
+      }
+
+      // Inject into Shadow Root via TactaDOM
+      if (shadowCss.length > 0 && window.TactaDOM && typeof window.TactaDOM.injectStylesheet === 'function') {
+        for (var j = 0; j < shadowCss.length; j++) {
+          await window.TactaDOM.injectStylesheet(chrome.runtime.getURL(shadowCss[j]));
+        }
+      }
+
+      // Inject into Main Document via Background
+      if (headCss.length > 0) {
+        await sendMessage({
+          action: 'injectFeatureFiles',
+          featureId: feature.id,
+          css: headCss,
+          js: [],
+          injectScripts: []
+        });
+      }
+    }
+
     await sendMessage({
       action: 'injectFeatureFiles',
       featureId: feature.id,
-      css: feature.contentStyles || [],
+      css: [],
       js: feature.contentScripts || [],
       injectScripts: feature.injectScripts || []
     });

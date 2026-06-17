@@ -291,6 +291,7 @@
                 // The executeSuiteQL handler returns the result directly as an
                 // array of row objects, or wrapped in a result property.
                 if (Array.isArray(result)) return result;
+                if (result && Array.isArray(result.rows)) return result.rows;
                 if (result && Array.isArray(result.items)) return result.items;
                 if (result && Array.isArray(result.results)) return result.results;
                 // The service worker returns [{ result: [...] }] structure
@@ -414,7 +415,12 @@
         });
         _root.appendChild(panel);
 
-        document.body.appendChild(_root);
+        // Mount to Shadow DOM root if available, otherwise fallback to body
+        if (window.TactaDOM && typeof window.TactaDOM.getToolkitRoot === 'function') {
+            window.TactaDOM.getToolkitRoot().appendChild(_root);
+        } else {
+            document.body.appendChild(_root);
+        }
     }
 
     /**
@@ -711,6 +717,22 @@
         return [];
     }
 
+    function _rowValue(row, keys, index) {
+        if (!row) return '';
+        if (Array.isArray(row)) return row[index];
+        for (var i = 0; i < keys.length; i++) {
+            if (Object.prototype.hasOwnProperty.call(row, keys[i])) {
+                return row[keys[i]];
+            }
+        }
+        return '';
+    }
+
+    function _absoluteUrl(url) {
+        if (!url) return '';
+        return url.charAt(0) === '/' ? window.location.origin + url : url;
+    }
+
     function _resolveScriptFileFromSuiteQL() {
         var scriptId = _getCurrentScriptInternalId();
         if (!scriptId) return Promise.resolve(null);
@@ -730,11 +752,15 @@
                 var rows = _normalizeSuiteQLRows(result);
                 if (!rows.length) return null;
                 var row = rows[0];
-                var url = row.file_url || row.url || row.fileurl || row[2];
-                var name = row.file_name || row.name || row.filename || row[1] || '';
-                if (!url) return null;
+                var fileId = _rowValue(row, ['file_id', 'scriptfile'], 0);
+                var name = _rowValue(row, ['file_name', 'name', 'filename'], 1) || '';
+                var url = _rowValue(row, ['file_url', 'url', 'fileurl'], 2);
+                if (!url && fileId) {
+                    url = '/app/common/media/mediaitem.nl?id=' + encodeURIComponent(fileId);
+                }
                 return {
-                    url: url.charAt(0) === '/' ? window.location.origin + url : url,
+                    id: fileId,
+                    url: _absoluteUrl(url),
                     name: name
                 };
             })
@@ -745,13 +771,15 @@
     }
 
     function _findScriptFileFromDom() {
-        var links = document.querySelectorAll('a[href*="/app/common/media/"], a[href*="mediaitem"]');
+        var links = document.querySelectorAll('a[href*="/app/common/media/"], a[href*="/core/media/"], a[href*="mediaitem"]');
         for (var i = 0; i < links.length; i++) {
             var href = links[i].href || links[i].getAttribute('href') || '';
             var label = (links[i].textContent || href || '').toLowerCase();
             if (/\.(js|ts|ss)(?:\?|#|$)/i.test(href) || /\.(js|ts|ss)$/i.test(label)) {
+                var idMatch = href.match(/[?&]id=(\d+)/);
                 return {
-                    url: href.charAt(0) === '/' ? window.location.origin + href : href,
+                    id: idMatch ? idMatch[1] : '',
+                    url: _absoluteUrl(href),
                     name: links[i].textContent || ''
                 };
             }
@@ -765,25 +793,119 @@
         });
     }
 
+    function _isNetSuiteHtml(source) {
+        return /^\s*<!doctype html/i.test(source) || /^\s*<html[\s>]/i.test(source);
+    }
+
+    function _fetchText(url) {
+        return fetch(url, { credentials: 'include', cache: 'no-store' }).then(function (res) {
+            if (!res.ok) {
+                var error = new Error('HTTP ' + res.status);
+                error.status = res.status;
+                error.url = url;
+                throw error;
+            }
+            return res.text();
+        });
+    }
+
+    function _extractDownloadUrlFromHtml(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var link = doc.querySelector('a[download][href*="/core/media/"], a[href*="/core/media/media.nl"]');
+        if (!link) return '';
+        return _absoluteUrl(link.getAttribute('href') || link.href || '');
+    }
+
+    function _fetchScriptSource(file) {
+        if (!file || !file.url) return Promise.reject(new Error('Could not find the script file URL.'));
+
+        return _fetchText(file.url).then(function (source) {
+            if (!_isNetSuiteHtml(source)) {
+                return { source: source, fileUrl: file.url };
+            }
+
+            var downloadUrl = _extractDownloadUrlFromHtml(source);
+            if (!downloadUrl || downloadUrl === file.url) {
+                throw new Error('Resolved file page did not expose downloadable source text.');
+            }
+
+            return _fetchText(downloadUrl).then(function (downloadSource) {
+                return { source: downloadSource, fileUrl: downloadUrl };
+            });
+        }).catch(function (err) {
+            if (err && (err.status === 403 || err.status === 500)) {
+                throw new Error('NetSuite returned HTTP ' + err.status + ' for the script file' +
+                    (file.id ? ' #' + file.id : '') +
+                    '. The file may be locked or unavailable to the current role.');
+            }
+            throw err;
+        });
+    }
+
+    function _pushUnique(list, value) {
+        value = String(value || '').trim();
+        if (value && list.indexOf(value) < 0) list.push(value);
+    }
+
     function _analyzeScriptSource(source) {
-        var modules = [], records = [], fields = [], files = [];
+        var modules = [], records = [], fields = [], files = [], searches = [], sublists = [], entryPoints = [], actions = [], risks = [];
         source.replace(/(?:define|require)\s*\(\s*\[([\s\S]*?)\]/g, function (_, deps) {
             deps.replace(/['"]([^'"]+)['"]/g, function (_m, dep) {
-                if (modules.indexOf(dep) < 0) modules.push(dep);
+                _pushUnique(modules, dep);
             });
         });
-        source.replace(/record\.Type\.([A-Z0-9_]+)|type\s*:\s*['"]([a-z0-9_]+)['"]/gi, function (_, a, b) {
-            var value = a || b;
-            if (value && records.indexOf(value) < 0) records.push(value);
+        source.replace(/\b(beforeLoad|beforeSubmit|afterSubmit|pageInit|saveRecord|validateField|fieldChanged|postSourcing|lineInit|validateLine|validateInsert|validateDelete|sublistChanged|suitelet|onRequest|get|post|execute|summarize|map|reduce)\s*[:=]\s*function\b|\bfunction\s+(beforeLoad|beforeSubmit|afterSubmit|pageInit|saveRecord|validateField|fieldChanged|postSourcing|lineInit|validateLine|validateInsert|validateDelete|sublistChanged|onRequest|execute|summarize|map|reduce)\s*\(/g, function (_, a, b) {
+            _pushUnique(entryPoints, a || b);
         });
-        source.replace(/fieldId\s*:\s*['"]([^'"]+)['"]|getValue\s*\(\s*['"]([^'"]+)['"]|setValue\s*\(\s*['"]([^'"]+)['"]/g, function (_, a, b, c) {
-            var value = a || b || c;
-            if (value && fields.indexOf(value) < 0) fields.push(value);
+        source.replace(/record\.Type\.([A-Z0-9_]+)|record\.(?:load|create|copy|transform|submitFields)\s*\(\s*\{[\s\S]*?type\s*:\s*['"]?([a-z0-9_]+)['"]?/gi, function (_, a, b) {
+            var value = a || b;
+            _pushUnique(records, value);
+        });
+        source.replace(/fieldId\s*:\s*['"]([^'"]+)['"]|(?:getValue|setValue|getText|setText|lookupFields|submitFields)\s*\(\s*(?:\{[\s\S]*?fieldId\s*:\s*)?['"]([^'"]+)['"]/g, function (_, a, b) {
+            _pushUnique(fields, a || b);
+        });
+        source.replace(/sublistId\s*:\s*['"]([^'"]+)['"]|(?:selectLine|selectNewLine|commitLine|getSublistValue|setSublistValue|getCurrentSublistValue|setCurrentSublistValue)\s*\(\s*(?:\{[\s\S]*?sublistId\s*:\s*)?['"]([^'"]+)['"]/g, function (_, a, b) {
+            _pushUnique(sublists, a || b);
         });
         source.replace(/file\.load\s*\(\s*(?:\{[\s\S]*?id\s*:\s*)?['"]?([^'"\}\),\s]+)['"]?/g, function (_, value) {
-            if (value && files.indexOf(value) < 0) files.push(value);
+            _pushUnique(files, value);
         });
-        return { modules: modules, records: records, fields: fields, files: files };
+        source.replace(/search\.(?:load|create)\s*\(\s*(?:\{[\s\S]*?(?:id|type)\s*:\s*)?['"]([^'"]+)['"]/g, function (_, value) {
+            _pushUnique(searches, value);
+        });
+        [
+            { pattern: /record\.(?:create|copy|transform)\s*\(/, label: 'Creates or transforms records' },
+            { pattern: /record\.(?:save|submitFields|delete)\s*\(/, label: 'Updates or deletes records' },
+            { pattern: /search\.(?:load|create)\s*\(/, label: 'Loads or creates searches' },
+            { pattern: /email\.send\s*\(/, label: 'Sends email' },
+            { pattern: /https?\.(?:get|post|put|delete)\s*\(/, label: 'Calls external/internal HTTP endpoints' },
+            { pattern: /task\.create\s*\(/, label: 'Starts background tasks' },
+            { pattern: /redirect\./, label: 'Redirects the user' },
+            { pattern: /runtime\.executionContext|runtime\.ContextType/, label: 'Branches by execution context' }
+        ].forEach(function (rule) {
+            if (rule.pattern.test(source)) _pushUnique(actions, rule.label);
+        });
+        if (fields.length > 40) risks.push('Large field surface area');
+        if (/ignoreMandatoryFields\s*:\s*true/.test(source)) risks.push('Bypasses mandatory field validation');
+        if (/governance|usage|yield/i.test(source)) risks.push('Contains governance handling');
+        return {
+            modules: modules,
+            entryPoints: entryPoints,
+            records: records,
+            fields: fields,
+            sublists: sublists,
+            searches: searches,
+            files: files,
+            actions: actions,
+            risks: risks
+        };
+    }
+
+    function _renderAnalysisList(label, values, limit) {
+        var list = values || [];
+        var shown = list.slice(0, limit || 30);
+        var suffix = list.length > shown.length ? ' +' + (list.length - shown.length) + ' more' : '';
+        return '<div><strong>' + _escapeHtml(label) + ':</strong> ' + _escapeHtml(shown.join(', ') || '-') + _escapeHtml(suffix) + '</div>';
     }
 
     function _renderScriptRecordAnalysis() {
@@ -825,26 +947,25 @@
 
         _resolveScriptFile()
             .then(function (file) {
-                if (!file || !file.url) throw new Error('Could not find the script file URL.');
-                return fetch(file.url, { credentials: 'same-origin' }).then(function (res) {
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    return res.text().then(function (source) {
-                        return { source: source, fileUrl: file.url };
-                    });
-                });
+                return _fetchScriptSource(file);
             })
             .then(function (result) {
                 var source = result.source;
                 var fileUrl = result.fileUrl;
-                if (/^\s*<!doctype html/i.test(source) || /^\s*<html[\s>]/i.test(source)) {
+                if (_isNetSuiteHtml(source)) {
                     throw new Error('Resolved link returned a NetSuite page instead of source text.');
                 }
                 var analysis = _analyzeScriptSource(source);
                 panel.querySelector('.tacta-sa__source-body').innerHTML =
-                    '<div><strong>Modules:</strong> ' + _escapeHtml(analysis.modules.join(', ') || '-') + '</div>' +
-                    '<div><strong>Records:</strong> ' + _escapeHtml(analysis.records.join(', ') || '-') + '</div>' +
-                    '<div><strong>Fields:</strong> ' + _escapeHtml(analysis.fields.slice(0, 60).join(', ') || '-') + '</div>' +
-                    '<div><strong>External files:</strong> ' + _escapeHtml(analysis.files.join(', ') || '-') + '</div>' +
+                    _renderAnalysisList('Entry points', analysis.entryPoints, 20) +
+                    _renderAnalysisList('Modules', analysis.modules, 30) +
+                    _renderAnalysisList('Records', analysis.records, 30) +
+                    _renderAnalysisList('Fields', analysis.fields, 60) +
+                    _renderAnalysisList('Sublists', analysis.sublists, 30) +
+                    _renderAnalysisList('Searches', analysis.searches, 30) +
+                    _renderAnalysisList('External files', analysis.files, 30) +
+                    _renderAnalysisList('Activity notes', analysis.actions, 20) +
+                    _renderAnalysisList('Risk notes', analysis.risks, 20) +
                     '<div><a href="' + _escapeHtml(fileUrl) + '" target="_blank" rel="noreferrer">Open script file</a></div>';
             })
             .catch(function (e) {

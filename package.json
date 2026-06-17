@@ -1,0 +1,21 @@
+{
+  "name": "tactasuite-ns-toolkit",
+  "version": "1.0.0",
+  "description": "Unified NetSuite developer toolkit",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && playwright test",
+    "test:browser": "playwright test",
+    "verify": "npm run build && npm run typecheck && playwright test"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/chrome": "^0.0.237",
+    "@playwright/test": "^1.38.0",
+    "playwright": "^1.38.0",
+    "esbuild": "^0.19.0"
+  }
+}
