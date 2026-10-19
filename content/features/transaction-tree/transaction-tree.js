@@ -261,7 +261,7 @@
                 var row = rows[i];
 
                 // If this record is the previousdoc, the nextdoc is downstream
-                if (row.previousdoc === transId && row.next_id) {
+                if (Number(row.previousdoc) === transId && row.next_id) {
                     if (!nextMap[row.next_id]) {
                         nextMap[row.next_id] = {
                             id: row.next_id,
@@ -275,7 +275,7 @@
                 }
 
                 // If this record is the nextdoc, the previousdoc is upstream
-                if (row.nextdoc === transId && row.prev_id) {
+                if (Number(row.nextdoc) === transId && row.prev_id) {
                     if (!prevMap[row.prev_id]) {
                         prevMap[row.prev_id] = {
                             id: row.prev_id,
@@ -292,7 +292,7 @@
             // Inbound shipment <-> PO links. PO is upstream of the shipment.
             for (var k = 0; k < inbRows.length; k++) {
                 var ir = inbRows[k];
-                if (ir.shipment === transId && ir.purchaseorder) {
+                if (Number(ir.shipment) === transId && ir.purchaseorder) {
                     if (!prevMap[ir.purchaseorder]) {
                         prevMap[ir.purchaseorder] = {
                             id: ir.purchaseorder,
@@ -303,7 +303,7 @@
                             entity: ir.po_entity
                         };
                     }
-                } else if (ir.purchaseorder === transId && ir.shipment) {
+                } else if (Number(ir.purchaseorder) === transId && ir.shipment) {
                     if (!nextMap[ir.shipment]) {
                         nextMap[ir.shipment] = {
                             id: ir.shipment,

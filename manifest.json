@@ -26,11 +26,12 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "https://*.netsuite.com/*"
+    "https://*.netsuite.com/*",
+    "https://*.oracle.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://*.netsuite.com/app/*"],
+      "matches": ["https://*.netsuite.com/app/*", "https://*.oracle.com/app/*"],
       "js": [
         "shared/ns-utils.js",
         "shared/storage-utils.js",
@@ -47,34 +48,51 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.netsuite.com/app/common/search/search.nl*"],
+      "matches": [
+        "https://*.netsuite.com/app/common/search/search.nl*",
+        "https://*.oracle.com/app/common/search/search.nl*"
+      ],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.netsuite.com/app/common/search/searchresults.nl*"],
+      "matches": [
+        "https://*.netsuite.com/app/common/search/searchresults.nl*",
+        "https://*.oracle.com/app/common/search/searchresults.nl*"
+      ],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.netsuite.com/app/accounting/transactions/*"],
+      "matches": [
+        "https://*.netsuite.com/app/accounting/transactions/*",
+        "https://*.oracle.com/app/accounting/transactions/*"
+      ],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.netsuite.com/app/common/scripting/script.nl*"],
+      "matches": [
+        "https://*.netsuite.com/app/common/scripting/script.nl*",
+        "https://*.oracle.com/app/common/scripting/script.nl*"
+      ],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.netsuite.com/app/common/workflow/setup/*"],
+      "matches": [
+        "https://*.netsuite.com/app/common/workflow/setup/*",
+        "https://*.oracle.com/app/common/workflow/setup/*"
+      ],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
     },
     {
       "matches": [
         "https://*.netsuite.com/app/common/dataset/*",
-        "https://*.netsuite.com/app/common/workbook/*"
+        "https://*.netsuite.com/app/common/workbook/*",
+        "https://*.oracle.com/app/common/dataset/*",
+        "https://*.oracle.com/app/common/workbook/*"
       ],
       "js": ["content/feature-loader.js"],
       "run_at": "document_idle"
@@ -90,7 +108,7 @@
         "content/features/**/*.css",
         "content/features/ns-utils/nav-search/nav-search-pages.js"
       ],
-      "matches": ["https://*.netsuite.com/*"]
+      "matches": ["https://*.netsuite.com/*", "https://*.oracle.com/*"]
     }
   ]
 }

@@ -38,12 +38,12 @@
     return executeSuiteQL(sql).then(function (result) {
       _files = (result.rows || []).map(function (row) {
         return {
-          id: row[0],
-          name: row[1],
-          url: row[2],
-          filetype: row[3],
-          folder: row[4],
-          size: Number(row[5] || 0)
+          id: row.id,
+          name: row.name,
+          url: row.url,
+          filetype: row.filetype,
+          folder: row.folder,
+          size: Number(row.documentsize || 0)
         };
       });
       return _files;

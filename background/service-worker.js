@@ -43,6 +43,9 @@ function setupDeclarativeContent() {
         conditions: [
           new chrome.declarativeContent.PageStateMatcher({
             pageUrl: { hostSuffix: '.netsuite.com' }
+          }),
+          new chrome.declarativeContent.PageStateMatcher({
+            pageUrl: { hostSuffix: '.oracle.com' }
           })
         ],
         actions: [new chrome.declarativeContent.ShowAction()]

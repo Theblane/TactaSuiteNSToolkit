@@ -295,5 +295,45 @@ export const FEATURES = [
     contentScripts: ['content/features/better-page-titles/better-page-titles.js'],
     contentStyles: [],
     injectScripts: []
+  },
+  {
+    id: 'csv-template-generator',
+    label: 'CSV Template Generator',
+    group: 'misc',
+    description: 'Generate a CSV import/export template from the current NetSuite record — all fields, mandatory only, with values, or a manual selection.',
+    defaultEnabled: true,
+    pageTypes: ['record-view', 'record-edit'],
+    trigger: 'popup',
+    contentScripts: ['content/features/csv-template-generator/csv-template-generator.js'],
+    contentStyles: ['content/features/csv-template-generator/csv-template-generator.css'],
+    injectScripts: ['content/features/csv-template-generator/csv-template-generator-client.js']
+  },
+
+  // ── Record ────────────────────────────────────────────────────────────────
+  {
+    id: 'audit-trail',
+    label: 'Audit Trail',
+    group: 'record',
+    description: 'View the full system notes / change history for the current record — sortable, filterable, and exportable.',
+    defaultEnabled: true,
+    pageTypes: ['record-view', 'record-edit'],
+    trigger: 'popup',
+    contentScripts: ['content/features/audit-trail/audit-trail.js'],
+    contentStyles: ['content/features/audit-trail/audit-trail.css'],
+    injectScripts: []
+  },
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  {
+    id: 'search-url-builder',
+    label: 'Search URL Builder',
+    group: 'search',
+    description: 'Generate shareable results URLs, edit links, and SuiteScript 2.1 snippets for the current saved search.',
+    defaultEnabled: true,
+    pageTypes: ['search-results', 'search-edit', 'search-list'],
+    trigger: 'popup',
+    contentScripts: ['content/features/search-url-builder/search-url-builder.js'],
+    contentStyles: ['content/features/search-url-builder/search-url-builder.css'],
+    injectScripts: []
   }
 ];
