@@ -80,6 +80,20 @@ export const FEATURES: FeatureDefinition[] = [
     injectScripts: ['content/features/console-tools/console-tools-client.js']
   },
   {
+    id: 'console-snippets',
+    label: 'Console Snippets',
+    group: 'developer',
+    description: 'Known-good console commands for the record you are on, with the internal ID pre-filled. Copy, paste into DevTools.',
+    defaultEnabled: false,
+    pageTypes: ['record-view', 'record-edit', 'list', 'script-record', 'suitelet',
+                'file-cabinet', 'dashboard', 'setup', 'other'],
+    trigger: 'popup',
+    contentScripts: ['content/features/console-snippets/console-snippets-data.js',
+                     'content/features/console-snippets/console-snippets.js'],
+    contentStyles: ['content/features/console-snippets/console-snippets.css'],
+    injectScripts: ['content/features/console-snippets/console-snippets-client.js']
+  },
+  {
     id: 'record-object',
     label: 'Record Object Viewer',
     group: 'developer',

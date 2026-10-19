@@ -19,6 +19,7 @@ TactaSuite NS Toolkit adds a single popup to NetSuite tabs that exposes a curate
 - **Script Explorer** — browse all scripts and deployments in the account.
 - **Script Content Search** — search SuiteScript files by source text; inspect module, record, field, file references.
 - **Console Tools** — `window.TactaNSKit` console helpers for quick current-record updates and inspection.
+- **Console Snippets** — record-aware library of known-good console commands with the internal ID pre-filled; copy and paste into DevTools. Developer mode only.
 - **Record Object Viewer** — view the raw `nlapiGetFieldValue` / `currentRecord` object as JSON.
 - **SuiteQL Runner** — run SuiteQL queries against NetSuite: editor, history, sortable results, CSV export.
 
@@ -27,10 +28,12 @@ TactaSuite NS Toolkit adds a single popup to NetSuite tabs that exposes a curate
 - **Saved Search Export** — one-click CSV/JSON export from saved search results pages.
 - **Field Finder** — quick-filter search columns and criteria fields by ID or label.
 - **Quick Search Creation** — shortcut buttons to create common saved searches from templates.
+- **Search URL Builder** — shareable results URLs, edit links, and SuiteScript 2.1 snippets for the current saved search.
 
 ### Record
 - **Field Help Tooltips** — enhanced field help popups (field ID, value, select options, set-value).
 - **Transaction Tree** — visualize the full transaction chain (SO → IF → INV) as an interactive tree.
+- **Audit Trail** — full system notes / change history for the current record: sortable, filterable, exportable.
 
 ### Layout
 - **Split View** — open the current page in a side-by-side split pane.
@@ -43,6 +46,7 @@ TactaSuite NS Toolkit adds a single popup to NetSuite tabs that exposes a curate
 - **CSV Import Viewer** — preview CSV import files in a formatted table before submitting.
 - **Workflow Colors** — color-code workflow states and transitions for easier visual parsing.
 - **Better Page Titles** — rewrite browser tab titles to include record type and name.
+- **CSV Template Generator** — build a CSV import/export template from the current record: all fields, mandatory only, with values, or a manual selection.
 
 ## Installation
 
