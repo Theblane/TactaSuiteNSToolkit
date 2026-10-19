@@ -29,8 +29,11 @@
         misc:      'Misc',
     };
 
-    /** Quick-action button IDs — only include implemented features */
-    const QUICK_ACTIONS = ['field-explorer', 'record-object', 'script-explorer', 'suiteql-runner'];
+    /** Quick-action button IDs — must stay in sync with popup.html */
+    const QUICK_ACTIONS = [
+        'field-explorer', 'record-object', 'script-explorer', 'suiteql-runner',
+        'csv-template-generator', 'audit-trail', 'search-url-builder', 'script-content-search',
+    ];
 
     const STORAGE_KEY_GROUPS = 'tacta_group_collapsed';
     const STORAGE_KEY_USER_TYPE = 'tacta_user_type';
@@ -46,6 +49,8 @@
             'field-explorer': false,
             'script-analyzer': false,
             'script-explorer': false,
+            'script-content-search': false,
+            'console-snippets': false,
             'record-object': false,
             'suiteql-runner': false,
             'saved-search-export': true,
@@ -53,6 +58,7 @@
             'quick-search-creation': true,
             'field-help': false,
             'transaction-tree': true,
+            'audit-trail': true,
             'split-view': false,
             'fixed-headers': true,
             'account-color': true,
@@ -60,12 +66,16 @@
             'pdf-tools': false,
             'csv-viewer': false,
             'workflow-colors': false,
-            'better-page-titles': true
+            'better-page-titles': true,
+            'csv-template-generator': true,
+            'search-url-builder': false
         },
         developer: {
             'field-explorer': true,
             'script-analyzer': true,
             'script-explorer': true,
+            'script-content-search': true,
+            'console-snippets': true,
             'record-object': true,
             'suiteql-runner': true,
             'saved-search-export': true,
@@ -73,6 +83,7 @@
             'quick-search-creation': true,
             'field-help': true,
             'transaction-tree': true,
+            'audit-trail': true,
             'split-view': false,
             'fixed-headers': true,
             'account-color': true,
@@ -80,7 +91,9 @@
             'pdf-tools': true,
             'csv-viewer': true,
             'workflow-colors': true,
-            'better-page-titles': true
+            'better-page-titles': true,
+            'csv-template-generator': true,
+            'search-url-builder': true
         }
     };
 
@@ -139,6 +152,7 @@
         renderFeatureGroups();
         renderActiveFeatures();
         updateQuickActions();
+        updateLaunchButtons();
         bindEvents();
         updateMeetingModeUI();
         if ($userTypeSelect) $userTypeSelect.value = userType;
@@ -219,9 +233,17 @@
     }
 
 
-    /* ── Quick Actions ────────────────────────────────────────────── */
+    /* ── Feature Launching ───────────────────────────────────────── */
 
-    function handleQuickAction(actionId) {
+    /**
+     * Inject and activate a feature in the current tab. Shared by the Quick
+     * Action buttons and the per-row Open buttons in the Features list.
+     * @param {string} featureId
+     */
+    function launchFeature(featureId) {
+        const feat  = features.find(f => f.id === featureId);
+        const label = feat ? feat.label : featureId;
+
         if (meetingMode) {
             showPopupError('Meeting mode is enabled — toggle it off to use features.');
             return;
@@ -230,20 +252,20 @@
             showPopupError('No active tab detected.');
             return;
         }
-        if (featureStates[actionId] !== true) {
-            showPopupError('"' + actionId + '" is disabled. Enable it below or switch to Developer mode.');
+        if (featureStates[featureId] !== true) {
+            showPopupError('"' + label + '" is disabled. Enable it below or switch to Developer mode.');
             return;
         }
 
         sendMessage({
             action:    'executeFeature',
-            featureId: actionId,
+            featureId: featureId,
             tabId:     currentTabId,
         }).then(() => {
             window.close();
         }).catch((err) => {
-            console.error('[Popup] Quick action failed:', err);
-            showPopupError('Quick action failed: ' + (err && err.message ? err.message : String(err)));
+            console.error('[Popup] Launch failed:', err);
+            showPopupError('Could not open "' + label + '": ' + (err && err.message ? err.message : String(err)));
         });
     }
 
@@ -301,6 +323,16 @@
         });
     }
 
+    /** Keep the per-row Open buttons in step with toggle and meeting-mode state. */
+    function updateLaunchButtons() {
+        if (!$featureGroups) return;
+        $featureGroups.querySelectorAll('.tacta-feature-launch[data-launch-id]').forEach((btn) => {
+            const enabled = featureStates[btn.dataset.launchId] === true;
+            btn.disabled = meetingMode || !enabled;
+            btn.classList.toggle('disabled', meetingMode || !enabled);
+        });
+    }
+
 
     /* ── Feature Groups & Toggles ─────────────────────────────────── */
 
@@ -339,16 +371,27 @@
             for (const feat of groupFeatures) {
                 const row = document.createElement('div');
                 row.className = 'tacta-feature-row';
+
+                // Features that only run when asked (trigger: 'popup') get an
+                // Open button — otherwise there is no way to launch them.
+                const launchBtn = feat.trigger === 'popup'
+                    ? `<button class="tacta-feature-launch" data-launch-id="${feat.id}"
+                               title="Open ${feat.label} on the current page">Open</button>`
+                    : '';
+
                 row.innerHTML = `
                     <div class="tacta-feature-info">
                         <span class="tacta-feature-name">${feat.label}</span>
                         <span class="tacta-feature-desc">${feat.description}</span>
                     </div>
-                    <label class="tacta-toggle">
-                        <input type="checkbox" data-feature-id="${feat.id}"
-                               ${featureStates[feat.id] ? 'checked' : ''}>
-                        <span class="tacta-toggle-track"></span>
-                    </label>`;
+                    <div class="tacta-feature-actions">
+                        ${launchBtn}
+                        <label class="tacta-toggle">
+                            <input type="checkbox" data-feature-id="${feat.id}"
+                                   ${featureStates[feat.id] ? 'checked' : ''}>
+                            <span class="tacta-toggle-track"></span>
+                        </label>
+                    </div>`;
                 items.appendChild(row);
             }
 
@@ -392,6 +435,7 @@
 
         renderActiveFeatures();
         updateQuickActions();
+        updateLaunchButtons();
     }
 
 
@@ -414,6 +458,7 @@
         document.body.classList.toggle('meeting-mode', meetingMode);
         $meetingToggle.classList.toggle('active', meetingMode);
         updateQuickActions();
+        updateLaunchButtons();
     }
 
 
@@ -432,7 +477,7 @@
         $quickActions.addEventListener('click', (e) => {
             const btn = e.target.closest('.tacta-action-btn');
             if (!btn) return;
-            handleQuickAction(btn.dataset.action);
+            launchFeature(btn.dataset.action);
         });
 
         // Feature toggles (delegated)
@@ -440,6 +485,14 @@
             if (e.target.matches('input[data-feature-id]')) {
                 handleFeatureToggle(e.target.dataset.featureId, e.target.checked);
             }
+        });
+
+        // Per-row Open buttons (delegated)
+        $featureGroups.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tacta-feature-launch');
+            if (!btn) return;
+            e.stopPropagation();
+            launchFeature(btn.dataset.launchId);
         });
 
         // Meeting mode
@@ -503,6 +556,7 @@
         renderFeatureGroups();
         renderActiveFeatures();
         updateQuickActions();
+        updateLaunchButtons();
     }
 
 

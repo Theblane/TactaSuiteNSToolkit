@@ -500,6 +500,49 @@ body {
     text-overflow: ellipsis;
 }
 
+.tacta-feature-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+
+/* ── Per-Row Launch Button ────────────────────────────────────────── */
+
+.tacta-feature-launch {
+    padding: 3px 9px;
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-full);
+    color: var(--tacta-text-secondary);
+    cursor: pointer;
+    font-family: var(--tacta-font-family);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    transition: all var(--tacta-transition-fast);
+}
+
+.tacta-feature-launch:hover {
+    background: var(--tacta-accent-muted);
+    border-color: var(--tacta-accent);
+    color: var(--tacta-accent);
+}
+
+.tacta-feature-launch:disabled,
+.tacta-feature-launch.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.tacta-feature-launch:focus-visible {
+    outline: 2px solid var(--tacta-accent);
+    outline-offset: 2px;
+}
+
 
 /* ── Toggle Switch ────────────────────────────────────────────────── */
 
