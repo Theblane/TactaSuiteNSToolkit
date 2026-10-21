@@ -62,8 +62,9 @@
 /* Fixed fallback when no header anchor exists */
 .tacta-env-badge--fixed {
     position: fixed;
-    top: 6px;
-    left: 8px;
+    top: 7px;
+    right: 10px;
+    left: auto;
     z-index: 2147483000;
     margin: 0;
 }

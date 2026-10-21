@@ -285,6 +285,11 @@
         var pill = buildPill();
         pill.classList.add(SC + '--fixed');
         (document.body || document.documentElement).appendChild(pill);
+        // Account Color used to float its own PRODUCTION / SANDBOX label in the
+        // same corner. This pill replaces it; Account Color keeps the color bar.
+        window.__tactaEnvBadgeActive = true;
+        var legacy = document.getElementById('tacta-account-color-badge');
+        if (legacy && legacy.parentNode) legacy.parentNode.removeChild(legacy);
     }
 
     /**

@@ -188,6 +188,15 @@
         // Push page content down to compensate for the fixed bar
         document.body.style.borderTop = '3px solid ' + env.color;
 
+        // The Environment Badge feature shows the label (with account id) in
+        // the same corner; when it is active this feature only draws the bar.
+        if (window.__tactaEnvBadgeActive || document.getElementById('tacta-env-badge')) {
+            requestAnimationFrame(function () {
+                if (_barElement) _barElement.classList.add('tacta-ac-visible');
+            });
+            return;
+        }
+
         // Create environment badge
         _badgeElement = document.createElement('div');
         _badgeElement.id = BADGE_ID;
