@@ -244,6 +244,44 @@
     border: 1px solid rgba(118, 192, 67, 0.2);
 }
 
+.tacta-nav-search__badge--Lookup {
+    background: rgba(118, 192, 67, 0.18);
+    color: var(--tacta-accent, #76c043);
+    border: 1px solid rgba(118, 192, 67, 0.35);
+}
+
+/* ── Lookup resolving / error states ───────────────────────────────── */
+
+.tacta-nav-search__result--resolving .tacta-nav-search__result-path {
+    color: var(--tacta-accent, #76c043);
+}
+
+.tacta-nav-search__result--resolving .tacta-nav-search__result-path::after {
+    content: '';
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-left: 6px;
+    vertical-align: -1px;
+    border: 2px solid var(--tacta-border-light, #444444);
+    border-top-color: var(--tacta-accent, #76c043);
+    border-radius: 50%;
+    animation: tacta-nav-search-spin 0.6s linear infinite;
+}
+
+@keyframes tacta-nav-search-spin {
+    to { transform: rotate(360deg); }
+}
+
+.tacta-nav-search__result--error {
+    border-left-color: var(--tacta-error, #e74c3c);
+}
+
+.tacta-nav-search__result--error .tacta-nav-search__result-path {
+    color: var(--tacta-error, #e74c3c);
+    font-family: var(--tacta-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+}
+
 /* ── Empty State ───────────────────────────────────────────────────── */
 
 .tacta-nav-search__empty {

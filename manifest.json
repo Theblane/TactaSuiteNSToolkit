@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NetSuite TactaSuite",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Unified NetSuite developer toolkit — field explorer, search export, script analysis, and 30+ productivity tools.",
   "author": "Blane Maher",
   "icons": {
@@ -28,6 +28,9 @@
   "host_permissions": [
     "https://*.netsuite.com/*",
     "https://*.oracle.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.amazonaws.com/*"
   ],
   "content_scripts": [
     {

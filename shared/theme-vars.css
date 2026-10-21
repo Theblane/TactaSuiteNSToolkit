@@ -4,7 +4,8 @@
  *
  * @author Blane Maher
  *
- * Defines the complete TactaSuite dark theme as CSS custom properties.
+ * Defines the TactaSuite theme as CSS custom properties. The defaults are the
+ * Light scheme; shared/theme-manager.js swaps in Dark or High Contrast at runtime.
  * All variables use the --tacta- prefix to avoid collisions with
  * NetSuite or other extensions.
  *
@@ -13,24 +14,24 @@
 
 :root {
     /* ── Primary Colors ─────────────────────────────────────────── */
-    --tacta-bg:              #1a1a1a;
-    --tacta-bg-elevated:     #222222;
-    --tacta-bg-hover:        #2a2a2a;
-    --tacta-bg-active:       #333333;
-    --tacta-bg-overlay:      rgba(0, 0, 0, 0.65);
+    --tacta-bg:              #f7f8fa;
+    --tacta-bg-elevated:     #ffffff;
+    --tacta-bg-hover:        #eef1f4;
+    --tacta-bg-active:       #e4e8ed;
+    --tacta-bg-overlay:      rgba(15, 23, 42, 0.35);
 
     --tacta-accent:          #76c043;
     --tacta-accent-hover:    #8ad454;
     --tacta-accent-active:   #65a738;
     --tacta-accent-muted:    rgba(118, 192, 67, 0.15);
 
-    --tacta-text:            #ffffff;
-    --tacta-text-secondary:  #cccccc;
-    --tacta-text-muted:      #888888;
-    --tacta-text-inverse:    #1a1a1a;
+    --tacta-text:            #17202a;
+    --tacta-text-secondary:  #3d4854;
+    --tacta-text-muted:      #66717d;
+    --tacta-text-inverse:    #ffffff;
 
-    --tacta-border:          #333333;
-    --tacta-border-light:    #444444;
+    --tacta-border:          #d7dde4;
+    --tacta-border-light:    #c3ccd6;
     --tacta-border-focus:    #76c043;
 
     /* ── Semantic Colors ────────────────────────────────────────── */

@@ -94,6 +94,28 @@ var NSExtension = {
     setNewValue: function(fieldId, val) {
         nlapiSetFieldValue(fieldId, val);
         _tactaClosePopup();
+    },
+
+    /**
+     * Lazy-load the system-note history for a body field into the popup.
+     * Triggered by the "Load" link rendered in divTactaHistory.
+     */
+    loadFieldHistory: function(fieldId) {
+        try { _tactaLoadFieldHistory(fieldId); } catch (err) {
+            console.log('[Tacta FieldHelp] Error loading field history: ' + err);
+        }
+    },
+
+    /**
+     * Expand the compact history list to every cached row.
+     */
+    showAllFieldHistory: function(fieldId) {
+        try {
+            var rows = _tactaHistoryCache[fieldId];
+            if (rows) _tactaRenderFieldHistory(fieldId, rows, true);
+        } catch (err) {
+            console.log('[Tacta FieldHelp] Error expanding field history: ' + err);
+        }
     }
 };
 
@@ -199,6 +221,229 @@ function _tactaGetSourceLink(fieldId) {
     } catch (_) {
         return '';
     }
+}
+
+
+// ── Field history (systemnote via SuiteQL) ───────────────────────
+// The page world cannot call chrome.runtime, so the query is relayed to
+// the field-help.js content script over window.postMessage; it forwards
+// to the background executeSuiteQL handler and posts the result back.
+// If the relay does not answer (content script missing) and NetSuite's
+// require() is available, N/query is used directly as a fallback.
+
+/** @type {string} postMessage namespace shared with field-help.js */
+var _TACTA_FH_NAMESPACE = 'TACTA_FIELD_HELP';
+
+/** @type {number} Compact rows shown before the "more" link */
+var _TACTA_FH_HISTORY_PREVIEW = 5;
+
+/** @type {number} ms to wait for the content-script relay before falling back */
+var _TACTA_FH_RELAY_TIMEOUT = 10000;
+
+/** @type {Object<string, Array<Object>>} Rows already fetched, by field id */
+var _tactaHistoryCache = {};
+
+/** @type {Object<string, {resolve: Function, reject: Function, timer: number}>} */
+var _tactaFhPending = {};
+
+var _tactaFhReqCounter = 0;
+
+window.addEventListener('message', function(event) {
+    if (event.source !== window) return;
+    var msg = event.data;
+    if (!msg || msg.namespace !== _TACTA_FH_NAMESPACE || msg.direction !== 'response') return;
+    var pending = _tactaFhPending[msg.requestId];
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    delete _tactaFhPending[msg.requestId];
+    if (msg.error) {
+        pending.reject(new Error(msg.error));
+    } else {
+        pending.resolve(msg.result || { rows: [] });
+    }
+});
+
+function _tactaRunSuiteQL(query) {
+    return new Promise(function(resolve, reject) {
+        var requestId = _TACTA_FH_NAMESPACE + '_' + (++_tactaFhReqCounter) + '_' + Date.now().toString(36);
+        var timer = setTimeout(function() {
+            delete _tactaFhPending[requestId];
+            _tactaRunSuiteQLDirect(query).then(resolve, reject);
+        }, _TACTA_FH_RELAY_TIMEOUT);
+        _tactaFhPending[requestId] = { resolve: resolve, reject: reject, timer: timer };
+        window.postMessage({
+            namespace: _TACTA_FH_NAMESPACE,
+            direction: 'request',
+            requestId: requestId,
+            action: 'executeSuiteQL',
+            query: query
+        }, '*');
+    });
+}
+
+function _tactaRunSuiteQLDirect(query) {
+    return new Promise(function(resolve, reject) {
+        if (typeof require !== 'function') {
+            reject(new Error('SuiteQL relay timed out and N/query is not available on this page.'));
+            return;
+        }
+        try {
+            require(['N/query'], function(queryModule) {
+                try {
+                    var rs = queryModule.runSuiteQL({ query: query });
+                    resolve({ rows: rs.asMappedResults() });
+                } catch (e) {
+                    reject(e);
+                }
+            }, function(err) {
+                reject(err || new Error('Failed to load N/query'));
+            });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+function _tactaSqlQuote(value) {
+    return "'" + String(value).replace(/'/g, "''") + "'";
+}
+
+function _tactaGetRecordId() {
+    try {
+        if (typeof nlapiGetRecordId === 'function') {
+            var rid = nlapiGetRecordId();
+            if (rid && /^\d+$/.test(String(rid))) return String(rid);
+        }
+    } catch (_) {}
+    var m = window.location.href.match(/[?&]id=(\d+)/);
+    return m ? m[1] : null;
+}
+
+// Body field = reachable through nlapiGetField, or rendered outside a
+// sublist machine table. Sublist columns are not addressable in systemnote.
+function _tactaIsBodyField(fieldId) {
+    try {
+        if (typeof nlapiGetField === 'function' && nlapiGetField(fieldId)) return true;
+    } catch (_) {}
+    var ids = [fieldId + '_fs_lbl', fieldId + '_fs', fieldId, 'inpt_' + fieldId, 'hddn_' + fieldId];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (!el) continue;
+        if (el.closest && el.closest('.uir-machine-table-container, table.uir-machine-table, .uir-machine-row, .uir-machine-headerrow')) {
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+function _tactaGetHelpDoc() {
+    var frame = document.getElementById('fieldhelp_frame');
+    if (!frame) return null;
+    try { return frame.contentWindow.document; } catch (_) { return null; }
+}
+
+/**
+ * Tries the uppercased id (CUSTBODY_X / ENTITY), then the raw id, then a
+ * suffix match for the RECTYPE.KFIELD form some standard fields use.
+ */
+function _tactaFetchFieldHistory(recordId, fieldId) {
+    var upper = String(fieldId).toUpperCase();
+    var candidates = [
+        'sn.field = ' + _tactaSqlQuote(upper),
+        'sn.field = ' + _tactaSqlQuote(fieldId),
+        'UPPER(sn.field) LIKE ' + _tactaSqlQuote('%.K' + upper)
+    ];
+
+    function attempt(i) {
+        if (i >= candidates.length) return Promise.resolve([]);
+        var sql = 'SELECT sn.date, sn.name, BUILTIN.DF(sn.name) AS username, sn.oldvalue, sn.newvalue ' +
+            'FROM systemnote sn ' +
+            'WHERE sn.record = ' + recordId + ' AND ' + candidates[i] + ' ' +
+            'ORDER BY sn.date DESC';
+        return _tactaRunSuiteQL(sql).then(function(result) {
+            var rows = (result && result.rows) ? result.rows : [];
+            if (rows.length > 0) return rows;
+            return attempt(i + 1);
+        });
+    }
+
+    return attempt(0);
+}
+
+function _tactaLoadFieldHistory(fieldId) {
+    if (!_tactaIsValidFieldId(fieldId)) return;
+    var doc = _tactaGetHelpDoc();
+    if (!doc) return;
+    var div = doc.getElementById('divTactaHistory');
+    if (!div) return;
+
+    if (_tactaHistoryCache[fieldId]) {
+        _tactaRenderFieldHistory(fieldId, _tactaHistoryCache[fieldId], false);
+        return;
+    }
+
+    var recordId = _tactaGetRecordId();
+    if (!recordId) {
+        div.innerHTML = '<span style="color:#666666">History: <i>record not saved yet</i></span>';
+        return;
+    }
+
+    div.innerHTML = '<span style="color:#666666">History: <i>Loading...</i></span>';
+
+    _tactaFetchFieldHistory(recordId, fieldId).then(function(rows) {
+        _tactaHistoryCache[fieldId] = rows;
+        _tactaRenderFieldHistory(fieldId, rows, false);
+    }).catch(function(err) {
+        var d = _tactaGetHelpDoc();
+        var target = d ? d.getElementById('divTactaHistory') : null;
+        if (target) {
+            target.innerHTML = '<span style="color:#666666">History: </span>' +
+                '<span style="color:#c0392b">' + _tactaEsc(err && err.message ? err.message : String(err)) + '</span> ' +
+                '(<a href="javascript:void(0)" onclick="window.parent.NSExtension.loadFieldHistory(\'' + _tactaEsc(fieldId) + '\');return false;">retry</a>)';
+        }
+    });
+}
+
+/**
+ * Compact table: date | user | old -> new. First 5 rows unless showAll.
+ */
+function _tactaRenderFieldHistory(fieldId, rows, showAll) {
+    var doc = _tactaGetHelpDoc();
+    if (!doc) return;
+    var div = doc.getElementById('divTactaHistory');
+    if (!div) return;
+
+    if (!rows || rows.length === 0) {
+        div.innerHTML = '<span style="color:#666666">History: <i>no system notes for this field</i></span>';
+        return;
+    }
+
+    var limit = showAll ? rows.length : Math.min(rows.length, _TACTA_FH_HISTORY_PREVIEW);
+    var html = '<div style="color:#666666;margin-bottom:2px">History: <b>' + rows.length + '</b> change' + (rows.length !== 1 ? 's' : '') + '</div>' +
+        '<table border="0" cellspacing="0" cellpadding="2" width="100%" role="presentation" style="font-size:11px"><tbody>';
+
+    for (var i = 0; i < limit; i++) {
+        var r = rows[i];
+        var who = r.username || r.name || '';
+        var oldVal = (r.oldvalue === null || r.oldvalue === undefined) ? '' : String(r.oldvalue);
+        var newVal = (r.newvalue === null || r.newvalue === undefined) ? '' : String(r.newvalue);
+        var bg = (i % 2 === 0) ? '#f1f1f1' : '#fafafa';
+        html += '<tr style="background-color:' + bg + '">' +
+            '<td style="white-space:nowrap;color:#666666">' + _tactaEsc(r.date || '') + '</td>' +
+            '<td style="color:#666666">' + _tactaEsc(who) + '</td>' +
+            '<td><span style="color:#999999;text-decoration:line-through">' + _tactaEsc(oldVal || '(empty)') + '</span>' +
+            ' -&gt; <b>' + _tactaEsc(newVal || '(empty)') + '</b></td></tr>';
+    }
+
+    html += '</tbody></table>';
+
+    if (!showAll && rows.length > limit) {
+        html += '<div style="color:#666666;margin-top:2px"><a href="javascript:void(0)" onclick="window.parent.NSExtension.showAllFieldHistory(\'' + _tactaEsc(fieldId) + '\');return false;">' +
+            'Show ' + (rows.length - limit) + ' more</a></div>';
+    }
+
+    div.innerHTML = html;
 }
 
 
@@ -416,6 +661,14 @@ function _tactaBuildEnhancement(fieldId, iframeDoc) {
 
     // Custom field info placeholder (populated async by _tactaDetectCustomFieldType)
     html += '<div id="divCustomFields"></div>';
+
+    // Field history (body fields on a saved record only; loaded on demand)
+    var showHistory = false;
+    try { showHistory = !!_tactaGetRecordId() && _tactaIsBodyField(fieldId); } catch (_) {}
+    if (showHistory) {
+        html += '<div id="divTactaHistory" style="text-align:right;padding:2px"><span style="color:#666666">History: ' +
+            '<a href="javascript:void(0)" onclick="window.parent.NSExtension.loadFieldHistory(\'' + _tactaEsc(fieldId) + '\');return false;">Load</a></span></div>';
+    }
 
     // Select options table
     if (dataOptions) {

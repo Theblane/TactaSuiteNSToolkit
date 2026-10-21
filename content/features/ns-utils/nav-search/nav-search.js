@@ -11,6 +11,11 @@
  * Search sources:
  *   1. Built-in page list (nav-search-pages.js) — ~75 common NS pages.
  *   2. Recent pages — last 20 visited pages stored in chrome.storage.local.
+ *   3. Script-id / record lookups - typing a script id (customscript_*,
+ *      customdeploy_*, customrecord_*, custbody_*, customlist_*, ...) or a
+ *      shorthand like "script:123" / "search:123" / "bundle:123" adds an
+ *      "Open <id>" result at the top. The target is resolved lazily via
+ *      SuiteQL (background executeSuiteQL) when selected.
  *
  * Features:
  *   - Fuzzy matching against title, URL path, and keywords.
@@ -46,6 +51,28 @@
     var IS_MAC = navigator.platform ? /Mac/i.test(navigator.platform) :
                  navigator.userAgent ? /Mac/i.test(navigator.userAgent) : false;
 
+    /** @type {RegExp} Script-id style lookup (customscript_x, custbody_x, ...) */
+    var SCRIPT_ID_LOOKUP_RE = /^(customscript|customdeploy|customrecord|customsearch|custbody|custcol|custentity|custitem|custevent|customlist|customworkflow|custform)_[a-z0-9_]+$/i;
+
+    /** @type {RegExp} Numeric shorthand lookup (script:123, search:123, bundle:123) */
+    var NUMERIC_LOOKUP_RE = /^(script|search|record|customrecord|bundle):\s*(\d+)$/i;
+
+    /** @type {string} Category label used for the synthetic lookup result */
+    var LOOKUP_CATEGORY = 'Lookup';
+
+    /**
+     * Custom field prefix -> definition page. The internal id comes from the
+     * customfield SuiteQL table; the page is picked by prefix.
+     * @type {Object<string, string>}
+     */
+    var CUSTOM_FIELD_PAGES = {
+        custbody: '/app/common/custom/bodycustfield.nl?id=',
+        custcol: '/app/common/custom/columncustfield.nl?id=',
+        custentity: '/app/common/custom/entitycustfield.nl?id=',
+        custitem: '/app/common/custom/itemcustfield.nl?id=',
+        custevent: '/app/common/custom/eventcustfield.nl?id='
+    };
+
     // ────────────────────────────────────────────────────────────────
     // State
     // ────────────────────────────────────────────────────────────────
@@ -76,6 +103,250 @@
 
     /** @type {Array<Object>} Built-in page list */
     var _builtinPages = [];
+
+    /** @type {boolean} True while a lookup result is being resolved via SuiteQL */
+    var _resolving = false;
+
+    // ────────────────────────────────────────────────────────────────
+    // Background Communication (SuiteQL for lookups)
+    // ────────────────────────────────────────────────────────────────
+
+    /**
+     * Sends a message to the background service worker.
+     * @param {Object} payload - Message payload with an 'action' key.
+     * @returns {Promise<Object>}
+     */
+    function sendToBackground(payload) {
+        return new Promise(function (resolve, reject) {
+            try {
+                chrome.runtime.sendMessage(payload, function (response) {
+                    if (chrome.runtime.lastError) {
+                        var msg = chrome.runtime.lastError.message || '';
+                        if (msg.indexOf('Extension context invalidated') >= 0) {
+                            reject(new Error('Extension was reloaded. Refresh this page (F5) to reconnect.'));
+                        } else {
+                            reject(new Error(msg));
+                        }
+                        return;
+                    }
+                    if (response && response.error) {
+                        reject(new Error(response.error));
+                    } else {
+                        resolve(response);
+                    }
+                });
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    /**
+     * Runs a SuiteQL statement and returns the first column of the first row.
+     * @param {string} sql
+     * @returns {Promise<string|null>}
+     */
+    function querySingleValue(sql) {
+        return sendToBackground({ action: 'executeSuiteQL', query: sql }).then(function (result) {
+            var rows = (result && result.rows) ? result.rows : [];
+            if (rows.length === 0) return null;
+            var first = rows[0];
+            var keys = Object.keys(first);
+            if (keys.length === 0) return null;
+            var val = first[keys[0]];
+            return (val === null || val === undefined) ? null : String(val);
+        });
+    }
+
+    /**
+     * Escapes a value for inlining inside single quotes in SuiteQL. The
+     * executor does not support bind params from this path.
+     * @param {string} value
+     * @returns {string}
+     */
+    function sqlQuote(value) {
+        return "'" + String(value).replace(/'/g, "''") + "'";
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Script-id / Record Lookup
+    // ────────────────────────────────────────────────────────────────
+
+    /**
+     * Builds a synthetic "Open <id>" result for a script-id style or numeric
+     * shorthand query. Returns null if the query is not a lookup or the type
+     * has no known target (record:N is ambiguous, custform_* has no SuiteQL
+     * table).
+     *
+     * The returned entry has a `resolve()` function that returns a Promise
+     * for the absolute-path URL to open. Resolution happens on selection,
+     * not while typing.
+     *
+     * @param {string} rawQuery - Trimmed user input (original casing).
+     * @returns {Object|null}
+     */
+    function buildLookupResult(rawQuery) {
+        var q = (rawQuery || '').trim();
+        if (!q) return null;
+
+        var numeric = q.match(NUMERIC_LOOKUP_RE);
+        if (numeric) {
+            var kind = numeric[1].toLowerCase();
+            var num = numeric[2];
+            var directUrl = null;
+            var label = '';
+
+            switch (kind) {
+                case 'script':
+                    directUrl = '/app/common/scripting/script.nl?id=' + num;
+                    label = 'script #' + num;
+                    break;
+                case 'search':
+                    directUrl = '/app/common/search/searchresults.nl?searchid=' + num;
+                    label = 'saved search #' + num;
+                    break;
+                case 'bundle':
+                    directUrl = '/app/bundler/bundledetails.nl?sourcetype=PROD&id=' + num;
+                    label = 'bundle #' + num;
+                    break;
+                case 'customrecord':
+                    directUrl = '/app/common/custom/custrecord.nl?id=' + num;
+                    label = 'custom record type #' + num;
+                    break;
+                default:
+                    // record:N is ambiguous (no record type) - skip.
+                    return null;
+            }
+
+            return makeLookupEntry('Open ' + label, directUrl, function () {
+                return Promise.resolve(directUrl);
+            });
+        }
+
+        if (!SCRIPT_ID_LOOKUP_RE.test(q)) return null;
+
+        var id = q.toLowerCase();
+        var prefix = id.substring(0, id.indexOf('_'));
+        var quoted = sqlQuote(id);
+
+        switch (prefix) {
+            case 'customscript':
+                return makeLookupEntry('Open ' + id, 'script.nl via SuiteQL', function () {
+                    return querySingleValue('SELECT id FROM script WHERE LOWER(scriptid) = ' + quoted)
+                        .then(function (v) { return v ? '/app/common/scripting/script.nl?id=' + v : null; });
+                });
+
+            case 'customdeploy':
+                return makeLookupEntry('Open ' + id, 'scriptrecord.nl via SuiteQL', function () {
+                    return querySingleValue('SELECT id FROM scriptdeployment WHERE LOWER(scriptid) = ' + quoted)
+                        .then(function (v) { return v ? '/app/common/scripting/scriptrecord.nl?id=' + v : null; });
+                });
+
+            case 'customrecord':
+                return makeLookupEntry('Open ' + id, 'custrecord.nl via SuiteQL', function () {
+                    return querySingleValue('SELECT internalid FROM customrecordtype WHERE LOWER(scriptid) = ' + quoted)
+                        .then(function (v) { return v ? '/app/common/custom/custrecord.nl?id=' + v : null; });
+                });
+
+            case 'customsearch':
+                // The savedsearch SuiteQL table has no scriptid column, but
+                // NetSuite accepts a script id directly in searchid.
+                var searchUrl = '/app/common/search/searchresults.nl?searchid=' + encodeURIComponent(id);
+                return makeLookupEntry('Open ' + id, searchUrl, function () {
+                    return Promise.resolve(searchUrl);
+                });
+
+            case 'customlist':
+                return makeLookupEntry('Open ' + id, 'custlist.nl via SuiteQL', function () {
+                    return querySingleValue('SELECT internalid FROM customlist WHERE LOWER(scriptid) = ' + quoted)
+                        .then(function (v) { return v ? '/app/common/custom/custlist.nl?id=' + v : null; });
+                });
+
+            case 'customworkflow':
+                return makeLookupEntry('Open ' + id, 'workflow.nl via SuiteQL', function () {
+                    return querySingleValue('SELECT id FROM workflow WHERE LOWER(scriptid) = ' + quoted)
+                        .then(function (v) { return v ? '/app/common/workflow/setup/workflow.nl?id=' + v : null; });
+                });
+
+            case 'custbody':
+            case 'custcol':
+            case 'custentity':
+            case 'custitem':
+            case 'custevent':
+                var fieldPage = CUSTOM_FIELD_PAGES[prefix];
+                return makeLookupEntry('Open ' + id, fieldPage.replace(/\?id=$/, '') + ' via SuiteQL', function () {
+                    return querySingleValue('SELECT internalid FROM customfield WHERE LOWER(scriptid) = ' + quoted)
+                        .then(function (v) { return v ? fieldPage + v : null; });
+                });
+
+            default:
+                // custform_* - no reliable SuiteQL table for custom forms.
+                return null;
+        }
+    }
+
+    /**
+     * Shapes a lookup entry so it renders like any other result.
+     * @param {string} title
+     * @param {string} pathLabel - Shown in the path line (informational only).
+     * @param {Function} resolve - Returns Promise<string|null> of the URL.
+     * @returns {Object}
+     */
+    function makeLookupEntry(title, pathLabel, resolve) {
+        return {
+            title: title,
+            path: pathLabel,
+            category: LOOKUP_CATEGORY,
+            keywords: [],
+            isLookup: true,
+            resolve: resolve
+        };
+    }
+
+    /**
+     * Resolves a lookup result and navigates. Shows "Resolving..." on the
+     * item while the SuiteQL runs and an inline error if nothing is found.
+     * @param {number} index - Index into _currentResults.
+     */
+    function resolveAndNavigate(index) {
+        var page = _currentResults[index];
+        if (!page || !page.isLookup || _resolving) return;
+
+        _resolving = true;
+
+        var item = _resultsList ? _resultsList.querySelector('.tacta-nav-search__result[data-index="' + index + '"]') : null;
+        var pathEl = item ? item.querySelector('.tacta-nav-search__result-path') : null;
+
+        if (item) item.classList.add('tacta-nav-search__result--resolving');
+        if (item) item.classList.remove('tacta-nav-search__result--error');
+        if (pathEl) pathEl.textContent = 'Resolving...';
+
+        var finish = function () {
+            _resolving = false;
+            if (item) item.classList.remove('tacta-nav-search__result--resolving');
+        };
+
+        page.resolve().then(function (url) {
+            finish();
+            if (!url) {
+                showLookupError(item, pathEl, 'Not found in this account');
+                return;
+            }
+            closeOverlay();
+            window.location.href = url.charAt(0) === '/' ? window.location.origin + url : url;
+        }).catch(function (err) {
+            finish();
+            showLookupError(item, pathEl, (err && err.message) ? err.message : 'Lookup failed');
+        });
+    }
+
+    /**
+     * Marks a result item with an inline error message.
+     */
+    function showLookupError(item, pathEl, message) {
+        if (item) item.classList.add('tacta-nav-search__result--error');
+        if (pathEl) pathEl.textContent = message;
+    }
 
     // ────────────────────────────────────────────────────────────────
     // Page Data Loading
@@ -358,6 +629,11 @@
 
         // Return top results.
         var results = [];
+
+        // Script-id / numeric lookup goes first so Enter opens it directly.
+        var lookup = buildLookupResult(query);
+        if (lookup) results.push(lookup);
+
         var limit = Math.min(scored.length, MAX_RESULTS);
         for (var m = 0; m < limit; m++) {
             results.push(scored[m].page);
@@ -611,6 +887,12 @@
         var page = _currentResults[index];
         if (!page) return;
 
+        // Lookup results resolve their target via SuiteQL first.
+        if (page.isLookup) {
+            resolveAndNavigate(index);
+            return;
+        }
+
         closeOverlay();
 
         var url = page.path;
@@ -658,6 +940,7 @@
     function closeOverlay() {
         if (!_isOpen) return;
         _isOpen = false;
+        _resolving = false;
 
         _backdrop.classList.remove('tacta-nav-search--open');
     }
@@ -683,6 +966,7 @@
     function onInputChange() {
         var query = _input.value;
         _selectedIndex = 0;
+        _resolving = false;
         _currentResults = search(query);
         renderResults(query);
     }

@@ -20,7 +20,7 @@
     },
     {
       test: /\/app\//i,
-      features: ['quick-search-creation']
+      features: ['quick-search-creation', 'environment-badge', 'instant-ui']
     },
     {
       test: /\/app\/common\/search\/searchresults\.nl/i,
@@ -28,7 +28,7 @@
     },
     {
       test: /\/app\/accounting\/transactions\//i,
-      features: ['transaction-tree', 'field-help', 'script-analyzer', 'fixed-headers']
+      features: ['transaction-tree', 'transaction-trail', 'field-help', 'script-analyzer', 'fixed-headers']
     },
     {
       test: /\/app\/common\/scripting\/script\.nl/i,
@@ -40,11 +40,15 @@
     },
     {
       test: /\/app\/common\/dataset\//i,
-      features: ['suitescript-exporter']
+      features: ['suitescript-exporter', 'dataset-to-suiteql']
     },
     {
       test: /\/app\/common\/workbook\//i,
-      features: ['suitescript-exporter']
+      features: ['suitescript-exporter', 'dataset-to-suiteql']
+    },
+    {
+      test: /\/app\/center\/card\.nl/i,
+      features: ['portlet-refresher']
     }
   ];
 
@@ -116,6 +120,11 @@
         'csv-viewer.css',
         'split-view.css',
         'script-content-search.css',
+        'environment-badge.css',
+        'transaction-trail.css',
+        'dataset-to-suiteql.css',
+        'portlet-refresher.css',
+        'instant-ui.css',
         'script-analyzer.css'
       ];
       var shadowCss = [];

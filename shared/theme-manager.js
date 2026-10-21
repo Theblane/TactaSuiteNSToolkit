@@ -13,7 +13,7 @@
 
   var STORAGE_KEY = 'tacta_theme_settings';
   var DEFAULT_SETTINGS = {
-    scheme: 'dark',
+    scheme: 'light',
     accent: '#76c043'
   };
   var watching = false;

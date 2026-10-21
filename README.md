@@ -9,50 +9,61 @@ A unified NetSuite developer and administrator productivity toolkit, delivered a
 
 ## What it does
 
-NetSuite TactaSuite adds a single popup to NetSuite tabs that exposes a curated set of developer and admin features. Each feature can be toggled on or off independently, and a "Meeting Mode" toggle suppresses every visual modification at once so the UI looks stock during screen shares.
+NetSuite TactaSuite adds a single popup to NetSuite tabs that exposes a curated set of user, admin and developer features. Each feature can be toggled on or off independently, and a "Meeting Mode" toggle suppresses every visual modification at once so the UI looks stock during screen shares.
+
+On first install a setup walkthrough opens. It asks whether you are a Traditional User, an Administrator or a Developer, seeds the feature toggles for that role, then walks you through the features a few at a time so you can switch any of them on or off. Progress is saved on every step. Re-run it any time from the gear icon in the popup or from Settings.
 
 ## Features
 
+### AI
+- **AI Assistant** (optional, off until configured) - ask questions about the NetSuite account you are signed in to. The assistant is grounded with read-only tools: SuiteQL SELECT queries, the Records Catalog and the record on screen. It cannot write. Choose **Claude on Amazon Bedrock** (your own API key, optional host permission requested on save) or **NetSuite's own AI** through an N/llm RESTlet you deploy; the settings page shows the RESTlet code and a step-by-step install guide. Sensitive values (emails, phones, tax ids, card numbers) are masked before anything leaves the browser.
+
 ### Developer
-- **Field Explorer** — inspect every field on the current record: IDs, types, values, sublist columns.
-- **Script Analyzer** — analyze deployed scripts on the current record (entry points, usage, governance).
-- **Script Explorer** — browse all scripts and deployments in the account.
-- **Script Content Search** — search SuiteScript files by source text; inspect module, record, field, file references.
-- **Console Tools** — `window.TactaNSKit` console helpers for quick current-record updates and inspection.
-- **Console Snippets** — record-aware library of known-good console commands with the internal ID pre-filled; copy and paste into DevTools. Developer mode only.
-- **Record Object Viewer** — view the raw `nlapiGetFieldValue` / `currentRecord` object as JSON.
-- **SuiteQL Runner** — run SuiteQL queries against NetSuite: editor, history, sortable results, CSV export.
+- **Field Explorer** - inspect every field on the current record: IDs, types, values, sublist columns.
+- **Script Analyzer** - analyze deployed scripts on the current record (entry points, usage, governance).
+- **Script Explorer** - browse all scripts and deployments in the account.
+- **Script Content Search** - search SuiteScript files by source text; inspect module, record, field, file references.
+- **Console Tools** - `window.TactaNSKit` console helpers for quick current-record updates and inspection.
+- **Console Snippets** - record-aware library of known-good console commands with the internal ID pre-filled; copy and paste into DevTools. Developer mode only.
+- **Record Object Viewer** - view the raw `nlapiGetFieldValue` / `currentRecord` object as JSON.
+- **SuiteQL Runner** - run SuiteQL queries against NetSuite: editor, history, named saved queries, sortable results, CSV and JSON export. Other features can hand it a query to open.
 
 ### Search
-- **SuiteScript Exporter** — export saved search, dataset, and workbook pages to SuiteScript 2.x TypeScript scaffolds.
-- **Saved Search Export** — one-click CSV/JSON export from saved search results pages.
-- **Field Finder** — quick-filter search columns and criteria fields by ID or label.
-- **Quick Search Creation** — shortcut buttons to create common saved searches from templates.
-- **Search URL Builder** — shareable results URLs, edit links, and SuiteScript 2.1 snippets for the current saved search.
+- **SuiteScript Exporter** - export saved search, dataset, and workbook pages to SuiteScript 2.x TypeScript scaffolds.
+- **Saved Search Export** - one-click CSV/JSON export from saved search results pages.
+- **Field Finder** - quick-filter search columns and criteria fields by ID or label.
+- **Quick Search Creation** - shortcut buttons to create common saved searches from templates.
+- **Search URL Builder** - shareable results URLs, edit links, and SuiteScript 2.1 snippets for the current saved search.
+- **Dataset to SuiteQL** - a Get SuiteQL button on dataset and workbook pages that returns the equivalent SuiteQL, with copy and open-in-runner.
 
 ### Record
-- **Field Help Tooltips** — enhanced field help popups (field ID, value, select options, set-value).
-- **Transaction Tree** — visualize the full transaction chain (SO → IF → INV) as an interactive tree.
-- **Audit Trail** — full system notes / change history for the current record: sortable, filterable, exportable.
+- **Field Help Tooltips** - enhanced field help popups (field ID, value, select options, set-value, per-field change history).
+- **Transaction Tree** - visualize the full transaction chain (SO → IF → INV) as an interactive tree.
+- **Transaction Trail** - breadcrumb chips under the page title showing the document chain through the current transaction; click to jump.
+- **Audit Trail** - full system notes / change history for the current record: sortable, filterable, exportable.
 
 ### Layout
-- **Split View** — open the current page in a side-by-side split pane.
-- **Fixed Headers** — pin sublist headers so they stay visible when scrolling.
+- **Split View** - open the current page in a side-by-side split pane.
+- **Fixed Headers** - pin sublist headers so they stay visible when scrolling.
+- **Instant UI** - collapse NetSuite animations and transitions so the interface responds immediately.
 
 ### Misc
-- **Account Color** — color-code the NetSuite header per environment (production vs. sandbox).
-- **Navigation Search** — keyboard-driven fuzzy search across NetSuite menu items (Ctrl+Shift+K).
-- **PDF Template Tools** — live preview and syntax helpers for Advanced PDF/HTML templates.
-- **CSV Import Viewer** — preview CSV import files in a formatted table before submitting.
-- **Workflow Colors** — color-code workflow states and transitions for easier visual parsing.
-- **Better Page Titles** — rewrite browser tab titles to include record type and name.
-- **CSV Template Generator** — build a CSV import/export template from the current record: all fields, mandatory only, with values, or a manual selection.
+- **Account Color** - color-code the NetSuite header per environment (production vs. sandbox).
+- **Environment Badge** - a PROD / SB1 / SB2 pill with the account id beside the logo, plus a [SB1] prefix on the tab title.
+- **Screenshot Studio** - visible, full-page or record-area PNG captures with privacy masks (emails, phones, tax ids, card numbers, amounts, custom text) and a clean mode that hides the NetSuite header.
+- **Portlet Refresher** - auto-refresh dashboard portlets on a 1 to 15 minute schedule while the tab is visible.
+- **Navigation Search** - keyboard-driven fuzzy search across NetSuite menu items (Ctrl+Shift+K); paste a script, field, record or search id (or script:/search:/bundle:N) to open it.
+- **PDF Template Tools** - live preview and syntax helpers for Advanced PDF/HTML templates.
+- **CSV Import Viewer** - preview CSV import files in a formatted table before submitting.
+- **Workflow Colors** - color-code workflow states and transitions for easier visual parsing.
+- **Better Page Titles** - rewrite browser tab titles to include record type and name.
+- **CSV Template Generator** - build a CSV import/export template from the current record: all fields, mandatory only, with values, or a manual selection.
 
 ## Installation
 
 ### From the Chrome Web Store
 
-*(Once published — link will be added here.)*
+*(Once published - link will be added here.)*
 
 ### Manual / Unpacked (development)
 
@@ -70,11 +81,14 @@ NetSuite TactaSuite adds a single popup to NetSuite tabs that exposes a curated 
 - Right-click on a NetSuite page for context menu actions (e.g., Split View).
 - For full feature management, theme settings, account color settings, and Quick Search type selection, open **Options** from the popup footer.
 
-### User Type Presets
+### User Types
 
-The popup has a **User / Developer** selector that applies a sensible defaults preset:
-- **User** — productivity tools only (Field Finder, Quick Search, Transaction Tree, etc.).
-- **Developer** — every feature enabled.
+The gear icon in the popup (and the setup walkthrough) lets you pick who you are. Each feature in the registry declares an `audience`, and the preset is derived from it so the popup, the settings page and the walkthrough always agree:
+- **Traditional User** - productivity tools only (Field Finder, Quick Search, Transaction Tree, Audit Trail, Environment Badge, Screenshot Studio, etc.).
+- **Administrator** - user tools plus Field Explorer, SuiteQL Runner, Field Help, PDF and CSV tools, Workflow Colors, AI Assistant.
+- **Developer** - everything except the opt-in extras (Split View, Portlet Refresher, Instant UI).
+
+The gear panel also holds the theme (Light is the default), accent color and the link to the AI Assistant settings.
 
 ## Permissions
 
@@ -87,11 +101,12 @@ The extension requests only what it needs to operate inside NetSuite:
 | `scripting` | Inject content scripts on demand for popup-triggered features (e.g., Field Explorer). |
 | `declarativeContent` | Show the extension action icon only on `*.netsuite.com` pages. |
 | `contextMenus` | Right-click menu entries (e.g., Split View). |
-| Host: `https://*.netsuite.com/*` | NetSuite uses per-account subdomains (`<accountid>.app.netsuite.com`), so wildcard host access is required. The extension communicates with no other origin. |
+| Host: `https://*.netsuite.com/*`, `https://*.oracle.com/*` | NetSuite uses per-account subdomains (`<accountid>.app.netsuite.com`), so wildcard host access is required. |
+| Optional host: `https://*.amazonaws.com/*` | Requested at runtime only if you choose Claude on Amazon Bedrock for the AI Assistant and save an API key. Revocable from the extension details page. |
 
 ## Privacy
 
-This extension does not collect, transmit, or store any user data on remote servers. All settings are stored locally in `chrome.storage.local`. See [PRIVACY.md](./PRIVACY.md).
+This extension does not collect, transmit, or store any user data on remote servers, and never contacts the developer. All settings are stored locally in `chrome.storage.local`. The only outbound request it can make is the optional AI Assistant call to the provider you configure yourself, and only when you press Send. See [PRIVACY.md](./PRIVACY.md).
 
 ## Architecture
 
@@ -109,9 +124,12 @@ TactaSuiteNSToolkit/
 │   ├── router.js                  Routes auto-triggered features
 │   ├── feature-loader.js          URL-pattern feature loader
 │   └── features/                  One folder per feature
-├── popup/                         Extension action popup
-├── options/                       Full-page settings
-├── shared/                        Cross-feature utilities and theme
+├── popup/                         Extension action popup (gear panel for settings)
+├── options/                       Full-page settings (AI Assistant section included)
+├── onboarding/                    Setup walkthrough shown on first install
+├── shared/                        Cross-feature utilities, theme, AI settings UI
+├── docs/                          Competitive review, roadmap, RESTlet source for NetSuite AI
+├── tests/                         Playwright page-world tests
 └── icons/
 ```
 
@@ -128,8 +146,10 @@ No build tooling. To make a change:
 2. Reload the extension in `chrome://extensions`.
 3. Refresh the NetSuite tab.
 
-To add a new feature, register it in `background/modules/feature-registry.js` and drop content/style files in a matching `content/features/<feature>/` folder.
+To add a new feature, register it in `background/modules/feature-registry.js` (including `audience` and `onboarding` copy) and drop content/style files in a matching `content/features/<feature>/` folder. CSS that styles the NetSuite page itself must be listed in the `globalStyles` arrays of `content/router.js` and `content/feature-loader.js`; everything else is injected into the toolkit's shadow root.
+
+Tests: `npx playwright test tests/field-explorer-pageworld.test.ts` (Node 20 or newer on PATH).
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT - see [LICENSE](./LICENSE).

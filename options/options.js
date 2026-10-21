@@ -18,15 +18,19 @@
 
     /* ── Constants ─────────────────────────────────────────────────── */
 
-    const GROUP_ORDER = ['developer', 'search', 'record', 'layout', 'misc'];
+    const GROUP_ORDER = ['ai', 'developer', 'search', 'record', 'layout', 'misc'];
 
     const GROUP_LABELS = {
+        ai:        'AI',
         developer: 'Developer',
         search:    'Search',
         record:    'Record',
         layout:    'Layout',
         misc:      'Misc',
     };
+
+    const USER_TYPES = ['user', 'admin', 'developer'];
+    const STORAGE_KEY_USER_TYPE = 'tacta_user_type';
 
     const STORAGE_KEY = 'featureStates';
 
@@ -107,7 +111,61 @@
         await loadAccountColorSettings();
         await loadGeneralSettings();
         await loadQscSettings();
+        await loadUserType();
+        mountAiSettings();
         bindEvents();
+        scrollToHash();
+    }
+
+    /** Deep links such as options.html#ai land on the matching section. */
+    function scrollToHash() {
+        const id = (location.hash || '').replace('#', '');
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ block: 'start' });
+    }
+
+    /** The AI settings UI lives in shared/ai-settings-ui.js so onboarding can reuse it. */
+    function mountAiSettings() {
+        const mount = document.getElementById('aiSettingsMount');
+        if (!mount) return;
+        if (window.TactaAISettingsUI && typeof window.TactaAISettingsUI.render === 'function') {
+            mount.innerHTML = '';
+            window.TactaAISettingsUI.render(mount, { compact: false });
+        }
+    }
+
+    /* ── User type ────────────────────────────────────────────────── */
+
+    async function loadUserType() {
+        const $sel = document.getElementById('userTypeSelect');
+        if (!$sel) return;
+        try {
+            const data = await chrome.storage.local.get(STORAGE_KEY_USER_TYPE);
+            $sel.value = USER_TYPES.indexOf(data[STORAGE_KEY_USER_TYPE]) !== -1 ? data[STORAGE_KEY_USER_TYPE] : 'user';
+        } catch (_) { $sel.value = 'user'; }
+    }
+
+    /**
+     * Apply the registry audience preset for a user type to every feature,
+     * persist both, and re-render the feature cards.
+     * @param {string} type
+     */
+    async function applyUserType(type) {
+        if (USER_TYPES.indexOf(type) === -1) return;
+        for (const f of features) {
+            featureStates[f.id] = Array.isArray(f.audience)
+                ? f.audience.indexOf(type) !== -1
+                : f.defaultEnabled === true;
+        }
+        try {
+            await sendMessage({ action: 'setFeatureStates', states: featureStates });
+        } catch (_) {
+            await chrome.storage.local.set({ [STORAGE_KEY]: featureStates });
+        }
+        await chrome.storage.local.set({ [STORAGE_KEY_USER_TYPE]: type });
+        renderFeatureList();
+        showToast('Features reset to the ' + type + ' preset', 'success');
     }
 
     async function loadState() {
@@ -357,6 +415,20 @@
         $importFile.addEventListener('change', handleImport);
         $resetBtn.addEventListener('click', resetToDefaults);
 
+        // User type + walkthrough
+        const $userType = document.getElementById('userTypeSelect');
+        if ($userType) {
+            $userType.addEventListener('change', () => applyUserType($userType.value));
+        }
+        const $walk = document.getElementById('runWalkthroughBtn');
+        if ($walk) {
+            $walk.addEventListener('click', () => {
+                sendMessage({ action: 'openOnboarding' }).catch(() => {
+                    chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/onboarding.html') });
+                });
+            });
+        }
+
         // General settings
         const $saveGeneralBtn = document.getElementById('saveGeneralSettings');
         if ($saveGeneralBtn) {
@@ -413,7 +485,7 @@
         const $scheme = document.getElementById('themeScheme');
         const $accent = document.getElementById('themeAccent');
         return {
-            scheme: $scheme ? $scheme.value : 'dark',
+            scheme: $scheme ? $scheme.value : 'light',
             accent: $accent ? $accent.value : '#76c043'
         };
     }

@@ -11,23 +11,23 @@
 /* ── CSS Custom Properties (popup-local) ──────────────────────────── */
 
 :root {
-    --tacta-bg:              #1a1a1a;
-    --tacta-bg-elevated:     #222222;
-    --tacta-bg-hover:        #2a2a2a;
-    --tacta-bg-active:       #333333;
+    --tacta-bg:              #f7f8fa;
+    --tacta-bg-elevated:     #ffffff;
+    --tacta-bg-hover:        #eef1f4;
+    --tacta-bg-active:       #e4e8ed;
 
     --tacta-accent:          #76c043;
     --tacta-accent-hover:    #8ad454;
     --tacta-accent-active:   #65a738;
     --tacta-accent-muted:    rgba(118, 192, 67, 0.15);
 
-    --tacta-text:            #ffffff;
-    --tacta-text-secondary:  #cccccc;
-    --tacta-text-muted:      #888888;
-    --tacta-text-inverse:    #1a1a1a;
+    --tacta-text:            #17202a;
+    --tacta-text-secondary:  #3d4854;
+    --tacta-text-muted:      #66717d;
+    --tacta-text-inverse:    #ffffff;
 
-    --tacta-border:          #333333;
-    --tacta-border-light:    #444444;
+    --tacta-border:          #d7dde4;
+    --tacta-border-light:    #c3ccd6;
     --tacta-border-focus:    #76c043;
 
     --tacta-success:         #76c043;
@@ -647,4 +647,147 @@ body.meeting-mode .tacta-active-features {
     color: var(--tacta-text-muted);
     font-weight: 600;
     letter-spacing: 0.5px;
+}
+
+
+/* ── Gear button + settings panel ─────────────────────────────── */
+
+.tacta-gear-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-left: 6px;
+    color: var(--tacta-text-secondary);
+    background: transparent;
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    cursor: pointer;
+    transition: color var(--tacta-transition-fast), border-color var(--tacta-transition-fast), background var(--tacta-transition-fast);
+}
+
+.tacta-gear-btn:hover,
+.tacta-gear-btn.active {
+    color: var(--tacta-accent);
+    border-color: var(--tacta-accent);
+    background: var(--tacta-accent-muted);
+}
+
+.tacta-settings-panel {
+    padding: 10px 14px 12px;
+    background: var(--tacta-bg-elevated);
+    border-bottom: 1px solid var(--tacta-border);
+}
+
+.tacta-settings-panel[hidden] {
+    display: none;
+}
+
+.tacta-settings-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+}
+
+.tacta-settings-row-toggle {
+    justify-content: space-between;
+}
+
+.tacta-settings-label {
+    min-width: 48px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--tacta-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tacta-settings-hint {
+    flex-basis: 100%;
+    font-size: 10.5px;
+    color: var(--tacta-text-muted);
+}
+
+.tacta-segmented {
+    display: inline-flex;
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    overflow: hidden;
+}
+
+.tacta-segment {
+    padding: 4px 10px;
+    font-size: 11.5px;
+    color: var(--tacta-text-secondary);
+    background: var(--tacta-bg);
+    border: none;
+    border-right: 1px solid var(--tacta-border);
+    cursor: pointer;
+}
+
+.tacta-segment:last-child {
+    border-right: none;
+}
+
+.tacta-segment:hover {
+    background: var(--tacta-bg-hover);
+}
+
+.tacta-segment.active {
+    color: var(--tacta-text-inverse);
+    background: var(--tacta-accent);
+}
+
+.tacta-settings-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--tacta-text-secondary);
+}
+
+.tacta-settings-inline input[type="color"] {
+    width: 26px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-sm);
+    background: transparent;
+    cursor: pointer;
+}
+
+.tacta-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+}
+
+.tacta-settings-btn {
+    padding: 5px 10px;
+    font-size: 11.5px;
+    color: var(--tacta-text);
+    background: var(--tacta-bg);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-md);
+    cursor: pointer;
+}
+
+.tacta-settings-btn:hover {
+    border-color: var(--tacta-accent);
+    color: var(--tacta-accent);
+}
+
+.tacta-settings-btn-primary {
+    color: var(--tacta-text-inverse);
+    background: var(--tacta-accent);
+    border-color: var(--tacta-accent);
+}
+
+.tacta-settings-btn-primary:hover {
+    color: var(--tacta-text-inverse);
+    background: var(--tacta-accent-hover);
 }

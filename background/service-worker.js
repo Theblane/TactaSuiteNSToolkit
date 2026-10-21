@@ -13,6 +13,11 @@
 import { FEATURES } from './modules/feature-registry.js';
 import { initDefaults, getFeatureStates, setFeatureState, setFeatureStates, getMeetingMode, setMeetingMode } from './modules/storage-manager.js';
 import { setupContextMenus } from './modules/context-menu-manager.js';
+import { handleAiMessage } from './modules/ai-provider.js';
+import { handleScreenshotMessage } from './modules/screenshot.js';
+
+const ONBOARDING_URL = 'onboarding/onboarding.html';
+const OPTIONS_URL = 'options/options.html';
 
 // ---------------------------------------------------------------------------
 // Installation
@@ -23,6 +28,16 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     // Persist default feature toggles on first install (or after update adds
     // new features). Existing user preferences are preserved.
     await initDefaults(FEATURES);
+  }
+
+  // First install: open the setup walkthrough. It asks who the user is,
+  // seeds the feature toggles for that user type and explains each feature.
+  if (details.reason === 'install') {
+    try {
+      await chrome.tabs.create({ url: chrome.runtime.getURL(ONBOARDING_URL) });
+    } catch (e) {
+      console.warn('[TactaSuite] Could not open onboarding:', e);
+    }
   }
 
   // Context menus
@@ -204,8 +219,34 @@ async function handleMessage(message, sender) {
       return nsRunInPage(slTabId, getFieldSourceLinkFn, [message.fieldId]);
     }
 
-    default:
+    // -- Extension pages ----------------------------------------------------
+    case 'openOptions': {
+      const hash = message.hash ? '#' + String(message.hash).replace(/^#/, '') : '';
+      await chrome.tabs.create({ url: chrome.runtime.getURL(OPTIONS_URL + hash) });
+      return { success: true };
+    }
+
+    case 'openOnboarding': {
+      const step = message.step ? '?step=' + encodeURIComponent(message.step) : '';
+      await chrome.tabs.create({ url: chrome.runtime.getURL(ONBOARDING_URL + step) });
+      return { success: true };
+    }
+
+    default: {
+      // Delegated handlers (AI assistant, Screenshot Studio). Each returns
+      // undefined when the action is not one of its own.
+      const deps = {
+        executeSuiteQL,
+        runInPage: nsRunInPage,
+        getPageInfo,
+        getRecordFields: (tabId) => nsRunInPage(tabId, feGetRecordFieldsFn, [])
+      };
+      const aiResult = await handleAiMessage(message, sender, deps);
+      if (aiResult !== undefined) return aiResult;
+      const shotResult = await handleScreenshotMessage(message, sender);
+      if (shotResult !== undefined) return shotResult;
       throw new Error(`Unrecognised action: ${message.action}`);
+    }
   }
 }
 

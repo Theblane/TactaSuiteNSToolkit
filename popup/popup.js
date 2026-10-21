@@ -5,7 +5,9 @@
  * @author Blane Maher
  *
  * Manages the extension popup: environment detection, quick actions,
- * feature toggles, meeting mode, and active-feature display.
+ * feature toggles, meeting mode, active-feature display and the gear
+ * settings panel (user type, theme, quick links to the walkthrough and
+ * the AI assistant settings).
  *
  * Communicates with the background service-worker via chrome.runtime
  * messages using the established { action, ... } protocol.
@@ -18,10 +20,11 @@
 
     /* ── Constants ─────────────────────────────────────────────────── */
 
-    const GROUP_ORDER = ['developer', 'search', 'record', 'layout', 'misc'];
+    const GROUP_ORDER = ['ai', 'developer', 'search', 'record', 'layout', 'misc'];
 
     /** Labels for display (groups are stored lowercase in the registry) */
     const GROUP_LABELS = {
+        ai:        'AI',
         developer: 'Developer',
         search:    'Search',
         record:    'Record',
@@ -29,73 +32,36 @@
         misc:      'Misc',
     };
 
+    /** User types offered in the gear panel and the onboarding walkthrough. */
+    const USER_TYPES = ['user', 'admin', 'developer'];
+
     /** Quick-action button IDs — must stay in sync with popup.html */
     const QUICK_ACTIONS = [
-        'field-explorer', 'record-object', 'script-explorer', 'suiteql-runner',
-        'csv-template-generator', 'audit-trail', 'search-url-builder', 'script-content-search',
+        'field-explorer', 'record-object', 'script-explorer', 'suiteql-runner', 'ai-assistant',
+        'screenshot-studio', 'csv-template-generator', 'audit-trail', 'search-url-builder',
+        'script-content-search',
     ];
 
     const STORAGE_KEY_GROUPS = 'tacta_group_collapsed';
     const STORAGE_KEY_USER_TYPE = 'tacta_user_type';
 
     /**
-     * Feature presets by user type.
-     * When the user switches type, these defaults are applied to all feature toggles.
-     * 'user' = end-user focused (productivity tools, no dev tools)
-     * 'developer' = all features on
+     * Preset for a user type, derived from each feature's registry `audience`
+     * so popup, options and onboarding can never disagree. Features without an
+     * audience fall back to defaultEnabled for every type.
+     * @param {string} type - 'user' | 'admin' | 'developer'
+     * @returns {Object<string, boolean>}
      */
-    const USER_TYPE_PRESETS = {
-        user: {
-            'field-explorer': false,
-            'script-analyzer': false,
-            'script-explorer': false,
-            'script-content-search': false,
-            'console-snippets': false,
-            'record-object': false,
-            'suiteql-runner': false,
-            'saved-search-export': true,
-            'field-finder': true,
-            'quick-search-creation': true,
-            'field-help': false,
-            'transaction-tree': true,
-            'audit-trail': true,
-            'split-view': false,
-            'fixed-headers': true,
-            'account-color': true,
-            'nav-search': true,
-            'pdf-tools': false,
-            'csv-viewer': false,
-            'workflow-colors': false,
-            'better-page-titles': true,
-            'csv-template-generator': true,
-            'search-url-builder': false
-        },
-        developer: {
-            'field-explorer': true,
-            'script-analyzer': true,
-            'script-explorer': true,
-            'script-content-search': true,
-            'console-snippets': true,
-            'record-object': true,
-            'suiteql-runner': true,
-            'saved-search-export': true,
-            'field-finder': true,
-            'quick-search-creation': true,
-            'field-help': true,
-            'transaction-tree': true,
-            'audit-trail': true,
-            'split-view': false,
-            'fixed-headers': true,
-            'account-color': true,
-            'nav-search': true,
-            'pdf-tools': true,
-            'csv-viewer': true,
-            'workflow-colors': true,
-            'better-page-titles': true,
-            'csv-template-generator': true,
-            'search-url-builder': true
+    function presetFor(type) {
+        const preset = {};
+        for (const f of features) {
+            preset[f.id] = Array.isArray(f.audience)
+                ? f.audience.indexOf(type) !== -1
+                : f.defaultEnabled === true;
         }
-    };
+        return preset;
+    }
+
 
 
     /* ── DOM References ───────────────────────────────────────────── */
@@ -108,7 +74,15 @@
     const $activeFeatures = document.getElementById('activeFeatures');
     const $featureGroups  = document.getElementById('featureGroups');
     const $optionsLink    = document.getElementById('optionsLink');
-    const $userTypeSelect = document.getElementById('userTypeSelect');
+    const $settingsToggle = document.getElementById('settingsToggle');
+    const $settingsPanel  = document.getElementById('settingsPanel');
+    const $userTypeSeg    = document.getElementById('userTypeSegment');
+    const $themeSeg       = document.getElementById('themeSegment');
+    const $accentColor    = document.getElementById('accentColor');
+    const $closeOutside   = document.getElementById('closeOnClickOutside');
+    const $runWalkthrough = document.getElementById('runWalkthroughBtn');
+    const $aiSettingsBtn  = document.getElementById('aiSettingsBtn');
+    const $allSettingsBtn = document.getElementById('allSettingsBtn');
 
 
     /* ── State ────────────────────────────────────────────────────── */
@@ -117,7 +91,8 @@
     let featureStates   = {};     // { featureId: boolean }
     let groupCollapsed  = {};     // { groupName: boolean }
     let meetingMode     = false;
-    let userType        = 'user'; // 'user' or 'developer'
+    let userType        = 'user'; // 'user' | 'admin' | 'developer'
+    let themeSettings   = null;   // { scheme, accent } from TactaThemeManager
     let currentTabId    = null;
     let currentTabUrl   = '';
 
@@ -157,7 +132,7 @@
         updateLaunchButtons();
         bindEvents();
         updateMeetingModeUI();
-        if ($userTypeSelect) $userTypeSelect.value = userType;
+        await loadSettingsPanel();
     }
 
     async function loadState() {
@@ -198,7 +173,7 @@
 
         // User type
         const utData = await chrome.storage.local.get(STORAGE_KEY_USER_TYPE);
-        userType = utData[STORAGE_KEY_USER_TYPE] || 'user';
+        userType = USER_TYPES.indexOf(utData[STORAGE_KEY_USER_TYPE]) !== -1 ? utData[STORAGE_KEY_USER_TYPE] : 'user';
     }
 
     /* ── Environment Detection ────────────────────────────────────── */
@@ -255,7 +230,7 @@
             return;
         }
         if (featureStates[featureId] !== true) {
-            showPopupError('"' + label + '" is disabled. Enable it below or switch to Developer mode.');
+            showPopupError('"' + label + '" is disabled. Enable it below or pick a different user type in Settings.');
             return;
         }
 
@@ -278,8 +253,8 @@
         bar.className = 'tacta-popup-error';
         bar.textContent = message;
         bar.style.cssText = 'position:fixed;left:8px;right:8px;bottom:36px;padding:8px 10px;' +
-            'background:#3a1a1a;color:#ff8888;border:1px solid #6a2a2a;border-radius:4px;' +
-            'font-size:11px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+            'background:var(--tacta-error-bg);color:var(--tacta-error);border:1px solid var(--tacta-error);border-radius:4px;' +
+            'font-size:11px;z-index:9999;box-shadow:var(--tacta-shadow-md);';
         document.body.appendChild(bar);
         setTimeout(function () { if (bar.parentNode) bar.remove(); }, 4000);
     }
@@ -500,12 +475,49 @@
         // Meeting mode
         $meetingToggle.addEventListener('click', toggleMeetingMode);
 
-        // User type selector
-        if ($userTypeSelect) {
-            $userTypeSelect.addEventListener('change', () => {
-                applyUserTypePreset($userTypeSelect.value);
+        // Gear settings panel
+        if ($settingsToggle) $settingsToggle.addEventListener('click', toggleSettingsPanel);
+        if ($userTypeSeg) {
+            $userTypeSeg.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-user-type]');
+                if (!btn || btn.dataset.userType === userType) return;
+                applyUserTypePreset(btn.dataset.userType);
+                renderUserTypeSegment();
             });
         }
+        if ($themeSeg) {
+            $themeSeg.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-scheme]');
+                if (!btn) return;
+                saveTheme({ scheme: btn.dataset.scheme });
+            });
+        }
+        if ($accentColor) {
+            $accentColor.addEventListener('input', () => {
+                if (window.TactaThemeManager) window.TactaThemeManager.apply({ ...(themeSettings || {}), accent: $accentColor.value });
+            });
+            $accentColor.addEventListener('change', () => saveTheme({ accent: $accentColor.value }));
+        }
+        if ($closeOutside) {
+            $closeOutside.addEventListener('change', () => {
+                chrome.storage.local.set({ tacta_close_on_click_outside: $closeOutside.checked });
+            });
+        }
+        if ($runWalkthrough) {
+            $runWalkthrough.addEventListener('click', () => {
+                sendMessage({ action: 'openOnboarding' }).then(() => window.close()).catch(() => {
+                    chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/onboarding.html') });
+                });
+            });
+        }
+        if ($aiSettingsBtn) {
+            $aiSettingsBtn.addEventListener('click', () => {
+                sendMessage({ action: 'openOptions', hash: 'ai' }).then(() => window.close()).catch(() => {
+                    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#ai') });
+                });
+            });
+        }
+        if ($allSettingsBtn) $allSettingsBtn.addEventListener('click', openOptions);
 
         // Options
         $optionsLink.addEventListener('click', openOptions);
@@ -528,15 +540,15 @@
     /* ── User Type Presets ─────────────────────────────────────────── */
 
     /**
-     * Applies a user type preset — sets all feature toggles to the preset
-     * defaults for the selected type, persists the choice, and re-renders.
-     * @param {string} type - 'user' or 'developer'
+     * Applies a user type preset: sets every feature toggle to the registry
+     * audience default for the selected type, persists the choice, re-renders.
+     * @param {string} type - 'user' | 'admin' | 'developer'
      */
     async function applyUserTypePreset(type) {
-        if (!USER_TYPE_PRESETS[type]) return;
+        if (USER_TYPES.indexOf(type) === -1) return;
 
         userType = type;
-        const preset = USER_TYPE_PRESETS[type];
+        const preset = presetFor(type);
 
         // Apply preset to local state
         for (const [featureId, enabled] of Object.entries(preset)) {
@@ -559,6 +571,60 @@
         renderActiveFeatures();
         updateQuickActions();
         updateLaunchButtons();
+    }
+
+
+    /* ── Gear settings panel ──────────────────────────────────────── */
+
+    async function loadSettingsPanel() {
+        renderUserTypeSegment();
+        if (window.TactaThemeManager) {
+            try {
+                themeSettings = await window.TactaThemeManager.load();
+            } catch (_) {
+                themeSettings = window.TactaThemeManager.DEFAULT_SETTINGS;
+            }
+            renderThemeSegment();
+        }
+        try {
+            const data = await chrome.storage.local.get('tacta_close_on_click_outside');
+            if ($closeOutside) $closeOutside.checked = data.tacta_close_on_click_outside === true;
+        } catch (_) { /* ignore */ }
+    }
+
+    function toggleSettingsPanel() {
+        if (!$settingsPanel) return;
+        const open = $settingsPanel.hasAttribute('hidden');
+        if (open) $settingsPanel.removeAttribute('hidden'); else $settingsPanel.setAttribute('hidden', '');
+        $settingsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        $settingsToggle.classList.toggle('active', open);
+    }
+
+    function renderUserTypeSegment() {
+        if (!$userTypeSeg) return;
+        $userTypeSeg.querySelectorAll('[data-user-type]').forEach((btn) => {
+            const on = btn.dataset.userType === userType;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+    }
+
+    function renderThemeSegment() {
+        if (!themeSettings) return;
+        if ($themeSeg) {
+            $themeSeg.querySelectorAll('[data-scheme]').forEach((btn) => {
+                const on = btn.dataset.scheme === themeSettings.scheme;
+                btn.classList.toggle('active', on);
+                btn.setAttribute('aria-checked', on ? 'true' : 'false');
+            });
+        }
+        if ($accentColor) $accentColor.value = themeSettings.accent;
+    }
+
+    async function saveTheme(partial) {
+        if (!window.TactaThemeManager) return;
+        themeSettings = await window.TactaThemeManager.save({ ...(themeSettings || {}), ...partial });
+        renderThemeSegment();
     }
 
 

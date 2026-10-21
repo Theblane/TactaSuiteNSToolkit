@@ -98,6 +98,11 @@
         'csv-viewer.css',
         'split-view.css',
         'script-content-search.css',
+        'environment-badge.css',
+        'transaction-trail.css',
+        'dataset-to-suiteql.css',
+        'portlet-refresher.css',
+        'instant-ui.css',
         'script-analyzer.css'
       ];
       var shadowCss = [];

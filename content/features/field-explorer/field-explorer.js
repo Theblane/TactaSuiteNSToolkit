@@ -32,6 +32,9 @@
     /** @type {string[]} Filter categories */
     var FILTER_OPTIONS = ['All', 'Body Fields', 'Sublist Fields', 'Hidden Fields'];
 
+    /** @type {number} System-note rows shown before "Show all" */
+    var HISTORY_PREVIEW_ROWS = 10;
+
     // ────────────────────────────────────────────────────────────────
     // State
     // ────────────────────────────────────────────────────────────────
@@ -50,6 +53,13 @@
 
     /** @type {string|null} Currently expanded field ID */
     var _expandedFieldId = null;
+
+    /**
+     * Field history rows already fetched this session, keyed by field id.
+     * Survives card re-renders (toggle/override) so the user does not reload.
+     * @type {Object<string, Array<Object>>}
+     */
+    var _historyCache = {};
 
     function _errorText(err) {
         var parts = [];
@@ -341,6 +351,7 @@
             _searchTerm = '';
             _activeFilter = 'All';
             _expandedFieldId = null;
+            _historyCache = {};
 
             if (typeof TactaDOM === 'undefined' || !TactaDOM.createSidebar) {
                 console.error('[TactaFE] TactaDOM not available — shared/dom-utils.js was not injected before field-explorer.js.');
@@ -791,9 +802,9 @@
             card.appendChild(_createExpandedDetails(field));
         }
 
-        // Click to expand/collapse — but not when interacting with override controls
+        // Click to expand/collapse — but not when interacting with override controls or the history list
         card.addEventListener('click', function (e) {
-            if (e.target.closest('.tacta-fe-override-section, .tacta-fe-options-table')) return;
+            if (e.target.closest('.tacta-fe-override-section, .tacta-fe-options-table, .tacta-fe-history')) return;
             var key = _getFieldUniqueKey(field);
             if (_expandedFieldId === key) {
                 _expandedFieldId = null;
@@ -885,6 +896,11 @@
             ]);
 
             details.appendChild(row);
+        }
+
+        // History row (body fields only - systemnote.field is a body-field id)
+        if (field._source !== 'sublist') {
+            details.appendChild(_createHistoryRow(field));
         }
 
         // Toggleable Mandatory / Disabled rows
@@ -1174,6 +1190,199 @@
             case 'xml': return 'Yes (only in record XML)';
             default: return 'Yes';
         }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Field history (systemnote via SuiteQL)
+    // ────────────────────────────────────────────────────────────────
+
+    /**
+     * Internal id of the record on the page, from the URL id= param.
+     * @returns {string|null}
+     */
+    function _getRecordId() {
+        try {
+            if (window.TactaNS && typeof window.TactaNS.getRecordId === 'function') {
+                var id = window.TactaNS.getRecordId();
+                if (id && /^\d+$/.test(id)) return id;
+            }
+        } catch (_) {}
+        var m = window.location.href.match(/[?&]id=(\d+)/);
+        return m ? m[1] : null;
+    }
+
+    function _sqlQuote(value) {
+        return "'" + String(value).replace(/'/g, "''") + "'";
+    }
+
+    /**
+     * Fetches system notes for one field on the current record.
+     *
+     * systemnote.field stores custom fields as e.g. CUSTBODY_X and standard
+     * fields by their internal name (ENTITY, MEMO ...). The uppercased id is
+     * tried first, then the raw id, then a suffix match for the
+     * "RECTYPE.KFIELD" form some standard fields use.
+     *
+     * @param {string} recordId
+     * @param {string} fieldId
+     * @returns {Promise<Array<Object>>}
+     */
+    function _fetchFieldHistory(recordId, fieldId) {
+        var upper = String(fieldId).toUpperCase();
+        var candidates = [
+            'sn.field = ' + _sqlQuote(upper),
+            'sn.field = ' + _sqlQuote(fieldId),
+            'UPPER(sn.field) LIKE ' + _sqlQuote('%.K' + upper)
+        ];
+
+        function attempt(i) {
+            if (i >= candidates.length) return Promise.resolve([]);
+            var sql = 'SELECT sn.date, sn.name, BUILTIN.DF(sn.name) AS username, sn.oldvalue, sn.newvalue ' +
+                'FROM systemnote sn ' +
+                'WHERE sn.record = ' + recordId + ' AND ' + candidates[i] + ' ' +
+                'ORDER BY sn.date DESC';
+            return _sendToBackground({ action: 'executeSuiteQL', query: sql }).then(function (result) {
+                var rows = (result && result.rows) ? result.rows : [];
+                if (rows.length > 0) return rows;
+                return attempt(i + 1);
+            });
+        }
+
+        return attempt(0);
+    }
+
+    /**
+     * Builds the "History" detail row with a lazy "Load" link. Loaded rows
+     * render inline beneath the row (10 first, "Show all" for the rest).
+     * @param {Object} field
+     * @returns {HTMLElement}
+     */
+    function _createHistoryRow(field) {
+        var wrapper = TactaDOM.createElement('div', { className: 'tacta-fe-history' });
+        var recordId = _getRecordId();
+
+        var valueEl;
+        if (!recordId) {
+            valueEl = TactaDOM.createElement('span', {
+                className: 'tacta-fe-detail-value',
+                textContent: '(unsaved record)'
+            });
+        } else {
+            valueEl = TactaDOM.createElement('span', {
+                className: 'tacta-fe-detail-value tacta-fe-link tacta-fe-history-load',
+                textContent: 'Load',
+                title: 'Fetch system notes for this field',
+                events: {
+                    click: function (e) {
+                        e.stopPropagation();
+                        _loadHistoryInto(wrapper, valueEl, recordId, field.id);
+                    }
+                }
+            });
+        }
+
+        wrapper.appendChild(TactaDOM.createElement('div', { className: 'tacta-fe-detail-row' }, [
+            TactaDOM.createElement('span', { className: 'tacta-fe-detail-key', textContent: 'History' }),
+            valueEl
+        ]));
+
+        // Re-render straight from cache if this field was already loaded.
+        if (recordId && _historyCache[field.id]) {
+            valueEl.textContent = _historyCache[field.id].length + ' change' + (_historyCache[field.id].length !== 1 ? 's' : '');
+            valueEl.classList.remove('tacta-fe-link', 'tacta-fe-history-load');
+            wrapper.appendChild(_renderHistoryList(_historyCache[field.id]));
+        }
+
+        return wrapper;
+    }
+
+    function _loadHistoryInto(wrapper, valueEl, recordId, fieldId) {
+        if (wrapper.querySelector('.tacta-fe-history-list, .tacta-fe-history-loading')) return;
+
+        valueEl.textContent = 'Loading...';
+        valueEl.classList.remove('tacta-fe-link', 'tacta-fe-history-load');
+
+        var loading = TactaDOM.createElement('div', {
+            className: 'tacta-fe-history-loading',
+            innerHTML: '<div class="tacta-spinner tacta-spinner--sm"></div> Querying system notes...'
+        });
+        wrapper.appendChild(loading);
+
+        _fetchFieldHistory(recordId, fieldId)
+            .then(function (rows) {
+                loading.remove();
+                _historyCache[fieldId] = rows;
+                valueEl.textContent = rows.length + ' change' + (rows.length !== 1 ? 's' : '');
+                wrapper.appendChild(_renderHistoryList(rows));
+            })
+            .catch(function (err) {
+                loading.remove();
+                valueEl.textContent = 'Load';
+                valueEl.classList.add('tacta-fe-link', 'tacta-fe-history-load');
+                wrapper.appendChild(TactaDOM.createElement('div', {
+                    className: 'tacta-fe-history-error',
+                    textContent: 'History failed: ' + (err && err.message ? err.message : String(err))
+                }));
+            });
+    }
+
+    /**
+     * Renders system-note rows: date, user, old -> new.
+     * @param {Array<Object>} rows
+     * @returns {HTMLElement}
+     */
+    function _renderHistoryList(rows) {
+        var list = TactaDOM.createElement('div', { className: 'tacta-fe-history-list' });
+
+        if (!rows || rows.length === 0) {
+            list.appendChild(TactaDOM.createElement('div', {
+                className: 'tacta-fe-history-empty',
+                textContent: 'No system notes for this field.'
+            }));
+            return list;
+        }
+
+        function appendRows(from, to) {
+            for (var i = from; i < to && i < rows.length; i++) {
+                var r = rows[i];
+                var who = r.username || r.name || '';
+                var oldVal = (r.oldvalue === null || r.oldvalue === undefined) ? '' : String(r.oldvalue);
+                var newVal = (r.newvalue === null || r.newvalue === undefined) ? '' : String(r.newvalue);
+
+                list.appendChild(TactaDOM.createElement('div', { className: 'tacta-fe-history-row' }, [
+                    TactaDOM.createElement('div', { className: 'tacta-fe-history-meta' }, [
+                        TactaDOM.createElement('span', { className: 'tacta-fe-history-date', textContent: String(r.date || '') }),
+                        TactaDOM.createElement('span', { className: 'tacta-fe-history-user', textContent: who })
+                    ]),
+                    TactaDOM.createElement('div', { className: 'tacta-fe-history-change' }, [
+                        TactaDOM.createElement('span', { className: 'tacta-fe-history-old', textContent: oldVal || '(empty)', title: oldVal }),
+                        TactaDOM.createElement('span', { className: 'tacta-fe-history-arrow', textContent: '->' }),
+                        TactaDOM.createElement('span', { className: 'tacta-fe-history-new', textContent: newVal || '(empty)', title: newVal })
+                    ])
+                ]));
+            }
+        }
+
+        appendRows(0, HISTORY_PREVIEW_ROWS);
+
+        if (rows.length > HISTORY_PREVIEW_ROWS) {
+            var moreLink = TactaDOM.createElement('a', {
+                className: 'tacta-fe-link tacta-fe-history-more',
+                textContent: 'Show all (' + rows.length + ')',
+                href: '#',
+                events: {
+                    click: function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        moreLink.remove();
+                        appendRows(HISTORY_PREVIEW_ROWS, rows.length);
+                    }
+                }
+            });
+            list.appendChild(moreLink);
+        }
+
+        return list;
     }
 
     /**

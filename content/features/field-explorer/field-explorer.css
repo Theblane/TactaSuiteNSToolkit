@@ -356,6 +356,109 @@
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   FIELD HISTORY (systemnote rows)
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-field-explorer .tacta-fe-history-load {
+    cursor: pointer;
+}
+
+.tacta-field-explorer .tacta-fe-history-loading {
+    display: flex;
+    align-items: center;
+    gap: var(--tacta-space-sm);
+    padding: var(--tacta-space-xs) 0;
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-muted);
+}
+
+.tacta-field-explorer .tacta-fe-history-list {
+    margin: var(--tacta-space-xs) 0 var(--tacta-space-xs);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-sm);
+    max-height: 260px;
+    overflow-y: auto;
+    cursor: default;
+}
+
+.tacta-field-explorer .tacta-fe-history-row {
+    padding: var(--tacta-space-xs) var(--tacta-space-sm);
+    border-bottom: 1px solid var(--tacta-border);
+    font-size: var(--tacta-font-size-xs);
+}
+
+.tacta-field-explorer .tacta-fe-history-row:last-of-type {
+    border-bottom: none;
+}
+
+.tacta-field-explorer .tacta-fe-history-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--tacta-space-sm);
+    color: var(--tacta-text-muted);
+}
+
+.tacta-field-explorer .tacta-fe-history-date {
+    white-space: nowrap;
+}
+
+.tacta-field-explorer .tacta-fe-history-user {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.tacta-field-explorer .tacta-fe-history-change {
+    display: flex;
+    align-items: baseline;
+    gap: var(--tacta-space-xs);
+    margin-top: 2px;
+    font-family: var(--tacta-font-mono);
+}
+
+.tacta-field-explorer .tacta-fe-history-old,
+.tacta-field-explorer .tacta-fe-history-new {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tacta-field-explorer .tacta-fe-history-old {
+    color: var(--tacta-text-muted);
+    text-decoration: line-through;
+}
+
+.tacta-field-explorer .tacta-fe-history-arrow {
+    flex-shrink: 0;
+    color: var(--tacta-text-muted);
+}
+
+.tacta-field-explorer .tacta-fe-history-new {
+    color: var(--tacta-accent);
+}
+
+.tacta-field-explorer .tacta-fe-history-more {
+    display: block;
+    padding: var(--tacta-space-xs) var(--tacta-space-sm);
+    border-top: 1px solid var(--tacta-border);
+    text-align: left;
+}
+
+.tacta-field-explorer .tacta-fe-history-empty,
+.tacta-field-explorer .tacta-fe-history-error {
+    padding: var(--tacta-space-xs) var(--tacta-space-sm);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-muted);
+}
+
+.tacta-field-explorer .tacta-fe-history-error {
+    color: var(--tacta-error);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TOGGLE LINKS (Mandatory / Disabled)
    ════════════════════════════════════════════════════════════════════ */
 

@@ -247,6 +247,127 @@
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   SAVED QUERIES DROPDOWN (shares the history dropdown shell)
+   ════════════════════════════════════════════════════════════════════ */
+
+.tacta-suiteql-runner .tacta-sql-saved-dropdown {
+    min-width: 360px;
+    max-width: 560px;
+    max-height: 340px;
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-form {
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    border-bottom: 1px solid var(--tacta-border);
+    background: var(--tacta-bg);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-input-row {
+    display: none;
+    align-items: center;
+    gap: var(--tacta-space-xs);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-input-row.tacta-visible {
+    display: flex;
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-name {
+    flex: 1;
+    min-width: 0;
+    padding: var(--tacta-space-xs) var(--tacta-space-sm);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text);
+    background: var(--tacta-bg-elevated);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-sm);
+    outline: none;
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-name:focus {
+    border-color: var(--tacta-accent);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-name--invalid {
+    border-color: var(--tacta-error);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--tacta-border);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item:last-child {
+    border-bottom: none;
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item:hover {
+    background: var(--tacta-bg-hover);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-load {
+    flex: 1;
+    min-width: 0;
+    padding: var(--tacta-space-sm) var(--tacta-space-md);
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    color: var(--tacta-text-secondary);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--tacta-space-sm);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-name {
+    font-size: var(--tacta-font-size-sm);
+    font-weight: 600;
+    color: var(--tacta-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-meta {
+    flex-shrink: 0;
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-muted);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-snippet {
+    margin-top: 2px;
+    font-family: var(--tacta-font-mono);
+    font-size: var(--tacta-font-size-xs);
+    color: var(--tacta-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-delete {
+    flex-shrink: 0;
+    width: 28px;
+    background: none;
+    border: none;
+    border-left: 1px solid var(--tacta-border);
+    color: var(--tacta-text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: color var(--tacta-transition-fast),
+                background var(--tacta-transition-fast);
+}
+
+.tacta-suiteql-runner .tacta-sql-saved-item-delete:hover {
+    color: var(--tacta-error);
+    background: var(--tacta-error-bg);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    RESULTS TABLE
    ════════════════════════════════════════════════════════════════════ */
 

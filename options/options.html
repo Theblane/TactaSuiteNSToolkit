@@ -15,7 +15,7 @@
                 <div class="tacta-opt-logo">
                     <span class="tacta-opt-logo-mark">T</span>
                     <div class="tacta-opt-logo-text">
-                        <span class="tacta-opt-title">NS Toolkit</span>
+                        <span class="tacta-opt-title">TactaSuite</span>
                         <span class="tacta-opt-subtitle">Settings</span>
                     </div>
                 </div>
@@ -62,6 +62,24 @@
                 <div class="tacta-opt-settings-form">
                     <div class="tacta-opt-setting-row">
                         <div class="tacta-opt-setting-info">
+                            <label class="tacta-opt-setting-label" for="userTypeSelect">I am a</label>
+                            <span class="tacta-opt-setting-hint">Picks the preset of features that are on by default. You can still toggle any feature individually above.</span>
+                        </div>
+                        <select id="userTypeSelect" class="tacta-opt-select">
+                            <option value="user">Traditional User</option>
+                            <option value="admin">Administrator</option>
+                            <option value="developer">Developer</option>
+                        </select>
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
+                            <span class="tacta-opt-setting-label">Setup walkthrough</span>
+                            <span class="tacta-opt-setting-hint">Re-run the guided tour that explains each feature and lets you turn them on or off a few at a time.</span>
+                        </div>
+                        <button class="tacta-opt-btn tacta-opt-btn-secondary" id="runWalkthroughBtn" type="button">Open walkthrough</button>
+                    </div>
+                    <div class="tacta-opt-setting-row">
+                        <div class="tacta-opt-setting-info">
                             <label class="tacta-opt-setting-label" for="closeOnClickOutside">Click outside panel to close</label>
                             <span class="tacta-opt-setting-hint">When enabled, clicking outside a floating panel (Field Explorer, etc.) will close it. When disabled, you must click the X button.</span>
                         </div>
@@ -104,6 +122,17 @@
                 </div>
             </section>
 
+            <!-- ── AI Assistant ─────────────────────────────────────── -->
+            <section class="tacta-opt-section" id="ai">
+                <h2 class="tacta-opt-section-title">AI Assistant</h2>
+                <p class="tacta-opt-section-desc">
+                    An assistant that is grounded in the NetSuite account you are signed in to. It can only read: SuiteQL SELECT queries, the Records Catalog and the record on screen. Choose Claude on Amazon Bedrock with your own API key, or NetSuite's own AI through a RESTlet you deploy. Nothing is sent anywhere until you configure a provider and press Send.
+                </p>
+                <div id="aiSettingsMount" class="tacta-opt-settings-form">
+                    <p class="tacta-opt-setting-hint">AI settings are loading. If this message stays, reload the extension.</p>
+                </div>
+            </section>
+
             <!-- Theme Settings -->
             <section class="tacta-opt-section">
                 <h2 class="tacta-opt-section-title">Theme Settings</h2>
@@ -117,8 +146,8 @@
                             <span class="tacta-opt-setting-hint">Controls the base surface, text, and border colors.</span>
                         </div>
                         <select id="themeScheme" class="tacta-opt-select">
-                            <option value="dark">Dark</option>
                             <option value="light">Light</option>
+                            <option value="dark">Dark</option>
                             <option value="contrast">High Contrast</option>
                         </select>
                     </div>
@@ -195,7 +224,7 @@
                     </div>
                     <div class="tacta-opt-about-row">
                         <span class="tacta-opt-about-label">Version</span>
-                        <span class="tacta-opt-about-value tacta-opt-mono">v1.1.0</span>
+                        <span class="tacta-opt-about-value tacta-opt-mono">v1.2.0</span>
                     </div>
                     <div class="tacta-opt-about-row">
                         <span class="tacta-opt-about-label">Features</span>
@@ -216,7 +245,7 @@
         <!-- ── Footer ─────────────────────────────────────────────── -->
         <footer class="tacta-opt-footer">
             <span class="tacta-opt-footer-brand">NetSuite TactaSuite</span>
-            <span class="tacta-opt-footer-version">v1.1.0</span>
+            <span class="tacta-opt-footer-version">v1.2.0</span>
         </footer>
     </div>
 
@@ -224,6 +253,7 @@
     <input type="file" id="importFile" accept=".json" style="display: none;">
 
     <script src="../shared/theme-manager.js"></script>
+    <script src="../shared/ai-settings-ui.js"></script>
     <script src="options.js"></script>
 </body>
 </html>

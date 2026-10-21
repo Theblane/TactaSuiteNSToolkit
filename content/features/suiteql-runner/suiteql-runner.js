@@ -43,6 +43,15 @@
     /** @type {number} Maximum number of history entries to keep */
     var MAX_HISTORY = 20;
 
+    /** @type {string} Chrome storage key for named saved queries */
+    var STORAGE_KEY_SAVED = 'tacta_sql_saved';
+
+    /** @type {number} Maximum number of saved queries to keep */
+    var MAX_SAVED = 100;
+
+    /** @type {number} Characters of query text shown in the saved list */
+    var SAVED_SNIPPET_LENGTH = 60;
+
     // ────────────────────────────────────────────────────────────────
     // State
     // ────────────────────────────────────────────────────────────────
@@ -74,11 +83,18 @@
     /** @type {boolean} Whether the history dropdown is visible */
     var _historyOpen = false;
 
+    /** @type {Array<{ id: string, name: string, query: string, createdAt: number, lastRunAt: number|null }>} Saved queries */
+    var _savedQueries = [];
+
+    /** @type {boolean} Whether the saved-queries dropdown is visible */
+    var _savedOpen = false;
+
     // ── DOM references ──
     var _editorEl = null;
     var _statusEl = null;
     var _resultsHost = null;
     var _historyDropdown = null;
+    var _savedDropdown = null;
 
     // ────────────────────────────────────────────────────────────────
     // Background Communication
@@ -190,12 +206,92 @@
         _saveHistory();
     }
 
+    // ── Saved queries ──
+
+    function _loadSaved() {
+        return _storageGet(STORAGE_KEY_SAVED).then(function (saved) {
+            _savedQueries = Array.isArray(saved) ? saved.filter(function (s) {
+                return s && typeof s.query === 'string';
+            }) : [];
+        });
+    }
+
+    function _saveSaved() {
+        return _storageSet(STORAGE_KEY_SAVED, _savedQueries);
+    }
+
+    function _generateSavedId() {
+        return 'sq_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+    }
+
+    /**
+     * Stores the current editor query under a name. Newest first, capped at MAX_SAVED.
+     * @param {string} name
+     * @param {string} query
+     * @returns {Object} The saved entry
+     */
+    function _addSavedQuery(name, query) {
+        var entry = {
+            id: _generateSavedId(),
+            name: name,
+            query: query,
+            createdAt: Date.now(),
+            lastRunAt: null
+        };
+        _savedQueries.unshift(entry);
+        if (_savedQueries.length > MAX_SAVED) {
+            _savedQueries = _savedQueries.slice(0, MAX_SAVED);
+        }
+        _saveSaved();
+        return entry;
+    }
+
+    function _deleteSavedQuery(id) {
+        _savedQueries = _savedQueries.filter(function (s) { return s.id !== id; });
+        _saveSaved();
+    }
+
+    /**
+     * Marks any saved entry whose text matches the executed query as run now.
+     * @param {string} query
+     */
+    function _touchSavedLastRun(query) {
+        var trimmed = query.trim();
+        var changed = false;
+        for (var i = 0; i < _savedQueries.length; i++) {
+            if (_savedQueries[i].query.trim() === trimmed) {
+                _savedQueries[i].lastRunAt = Date.now();
+                changed = true;
+            }
+        }
+        if (changed) _saveSaved();
+    }
+
     // ────────────────────────────────────────────────────────────────
     // Utility Helpers
     // ────────────────────────────────────────────────────────────────
 
     function _el(tag, attrs, children) {
         return window.TactaDOM.createElement(tag, attrs, children);
+    }
+
+    /**
+     * Compact "time ago" label for saved-query metadata.
+     * @param {number|null} ts
+     * @returns {string}
+     */
+    function _formatAgo(ts) {
+        if (!ts) return 'never run';
+        var diff = Date.now() - ts;
+        if (diff < 60000) return 'just now';
+        if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+        if (diff < 7 * 86400000) return Math.floor(diff / 86400000) + 'd ago';
+        return new Date(ts).toLocaleDateString();
+    }
+
+    function _fileTimestamp() {
+        return new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     }
 
     function _generateCSV(columns, rows) {
@@ -239,9 +335,21 @@
     // Panel Lifecycle
     // ────────────────────────────────────────────────────────────────
 
-    function _showPanel() {
+    /**
+     * Toggles the panel. When an incoming query is supplied (another feature
+     * handed us a query via the activation event) the panel is opened or kept
+     * open and the query is loaded instead of toggling closed.
+     * @param {{ query?: string, run?: boolean }} [incoming]
+     */
+    function _showPanel(incoming) {
+        var hasIncoming = !!(incoming && typeof incoming.query === 'string' && incoming.query.trim());
+
         if (_panelInstance) {
-            _closePanel();
+            if (hasIncoming) {
+                _applyIncomingQuery(incoming);
+            } else {
+                _closePanel();
+            }
             return;
         }
 
@@ -251,10 +359,27 @@
         }
 
         _loadHistory().then(function () {
+            return _loadSaved();
+        }).then(function () {
             return _loadPanelState();
         }).then(function (savedState) {
             _createPanel(savedState);
+            if (hasIncoming) _applyIncomingQuery(incoming);
         });
+    }
+
+    /**
+     * Loads a query handed in from another feature and optionally runs it.
+     * @param {{ query: string, run?: boolean }} incoming
+     */
+    function _applyIncomingQuery(incoming) {
+        if (!_editorEl) return;
+        _editorEl.value = incoming.query;
+        if (_isMinimized) _toggleMinimize();
+        _editorEl.focus();
+        if (incoming.run === true) {
+            _executeQuery();
+        }
     }
 
     function _closePanel() {
@@ -274,10 +399,12 @@
         _sortColumn = null;
         _sortAsc = true;
         _historyOpen = false;
+        _savedOpen = false;
         _editorEl = null;
         _statusEl = null;
         _resultsHost = null;
         _historyDropdown = null;
+        _savedDropdown = null;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -454,9 +581,24 @@
         historyWrapper.appendChild(historyBtn);
         historyWrapper.appendChild(_historyDropdown);
 
+        // Saved queries dropdown (named entries, persisted in tacta_sql_saved)
+        var savedWrapper = _el('div', { className: 'tacta-sql-history-wrapper' });
+        var savedBtn = _el('button', {
+            className: 'tacta-btn tacta-btn-sm',
+            textContent: 'Saved',
+            title: 'Saved queries'
+        });
+        savedBtn.addEventListener('click', function () {
+            _toggleSaved();
+        });
+
+        _savedDropdown = _el('div', { className: 'tacta-sql-history-dropdown tacta-sql-saved-dropdown' });
+        savedWrapper.appendChild(savedBtn);
+        savedWrapper.appendChild(_savedDropdown);
+
         _statusEl = _el('span', { className: 'tacta-sql-status' });
 
-        var toolbarLeft = _el('div', { className: 'tacta-sql-toolbar-left' }, [runBtn, historyWrapper]);
+        var toolbarLeft = _el('div', { className: 'tacta-sql-toolbar-left' }, [runBtn, historyWrapper, savedWrapper]);
         var toolbarRight = _el('div', { className: 'tacta-sql-toolbar-right' }, [_statusEl]);
         var toolbar = _el('div', { className: 'tacta-sql-toolbar' }, [toolbarLeft, toolbarRight]);
 
@@ -466,15 +608,200 @@
         _resultsHost = _el('div', { className: 'tacta-sql-results' });
         container.appendChild(_resultsHost);
 
-        // Close history dropdown when clicking outside
+        // Close dropdowns when clicking outside
         document.addEventListener('mousedown', function (e) {
             if (_historyOpen && _historyDropdown && !_historyDropdown.contains(e.target) && !historyBtn.contains(e.target)) {
                 _historyOpen = false;
                 _historyDropdown.classList.remove('tacta-visible');
             }
+            if (_savedOpen && _savedDropdown && !_savedDropdown.contains(e.target) && !savedBtn.contains(e.target)) {
+                _savedOpen = false;
+                _savedDropdown.classList.remove('tacta-visible');
+            }
         });
 
         return container;
+    }
+
+    function _closeSavedDropdown() {
+        _savedOpen = false;
+        if (_savedDropdown) _savedDropdown.classList.remove('tacta-visible');
+    }
+
+    function _toggleSaved() {
+        _savedOpen = !_savedOpen;
+        if (!_savedDropdown) return;
+
+        if (_savedOpen) {
+            // Only one dropdown open at a time
+            _historyOpen = false;
+            if (_historyDropdown) _historyDropdown.classList.remove('tacta-visible');
+            _renderSaved();
+            _savedDropdown.classList.add('tacta-visible');
+        } else {
+            _savedDropdown.classList.remove('tacta-visible');
+        }
+    }
+
+    /**
+     * Renders the saved-queries dropdown: a "save current" row (inline name
+     * input, no window.prompt) followed by the saved entries.
+     */
+    function _renderSaved() {
+        if (!_savedDropdown) return;
+        _savedDropdown.innerHTML = '';
+
+        var hasCurrent = !!(_editorEl && _editorEl.value.trim());
+
+        // ── Save current query row ──
+        var saveRow = _el('div', { className: 'tacta-sql-saved-form' });
+        var saveTrigger = _el('button', {
+            className: 'tacta-btn tacta-btn-sm tacta-btn-primary',
+            textContent: 'Save current query',
+            title: hasCurrent ? 'Save the query in the editor under a name' : 'Enter a query in the editor first'
+        });
+        if (!hasCurrent) saveTrigger.disabled = true;
+
+        var nameInput = _el('input', {
+            type: 'text',
+            className: 'tacta-input tacta-sql-saved-name',
+            placeholder: 'Name this query...',
+            maxlength: '80',
+            spellcheck: 'false'
+        });
+        var confirmBtn = _el('button', {
+            className: 'tacta-btn tacta-btn-sm tacta-btn-primary',
+            textContent: 'Save'
+        });
+        var cancelBtn = _el('button', {
+            className: 'tacta-btn tacta-btn-sm',
+            textContent: 'Cancel'
+        });
+        var inputRow = _el('div', { className: 'tacta-sql-saved-input-row' }, [nameInput, confirmBtn, cancelBtn]);
+
+        function showInput() {
+            saveTrigger.style.display = 'none';
+            inputRow.classList.add('tacta-visible');
+            nameInput.value = '';
+            nameInput.focus();
+        }
+
+        function hideInput() {
+            inputRow.classList.remove('tacta-visible');
+            saveTrigger.style.display = '';
+        }
+
+        function commitSave() {
+            var name = nameInput.value.trim();
+            var query = _editorEl ? _editorEl.value.trim() : '';
+            if (!query) {
+                hideInput();
+                return;
+            }
+            if (!name) {
+                nameInput.classList.add('tacta-sql-saved-name--invalid');
+                nameInput.focus();
+                return;
+            }
+            _addSavedQuery(name, query);
+            if (window.TactaDOM) window.TactaDOM.showToast('Saved "' + name + '"', 'success', 2000);
+            _renderSaved();
+        }
+
+        saveTrigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            showInput();
+        });
+        confirmBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            commitSave();
+        });
+        cancelBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            hideInput();
+        });
+        nameInput.addEventListener('input', function () {
+            nameInput.classList.remove('tacta-sql-saved-name--invalid');
+        });
+        nameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commitSave();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                hideInput();
+            }
+        });
+
+        saveRow.appendChild(saveTrigger);
+        saveRow.appendChild(inputRow);
+        _savedDropdown.appendChild(saveRow);
+
+        // ── Saved entries ──
+        if (_savedQueries.length === 0) {
+            _savedDropdown.appendChild(_el('div', {
+                className: 'tacta-sql-history-empty',
+                textContent: 'No saved queries yet'
+            }));
+            return;
+        }
+
+        for (var i = 0; i < _savedQueries.length; i++) {
+            _savedDropdown.appendChild(_createSavedItem(_savedQueries[i]));
+        }
+    }
+
+    /**
+     * Builds one saved-query row: name, snippet, last run, delete icon.
+     * @param {{ id: string, name: string, query: string, lastRunAt: number|null }} entry
+     * @returns {HTMLElement}
+     */
+    function _createSavedItem(entry) {
+        var oneLine = entry.query.replace(/\s+/g, ' ').trim();
+        var snippet = oneLine.length > SAVED_SNIPPET_LENGTH
+            ? oneLine.substring(0, SAVED_SNIPPET_LENGTH) + '...'
+            : oneLine;
+
+        var nameEl = _el('span', { className: 'tacta-sql-saved-item-name', textContent: entry.name });
+        var metaEl = _el('span', {
+            className: 'tacta-sql-saved-item-meta',
+            textContent: 'Last run: ' + _formatAgo(entry.lastRunAt)
+        });
+        var snippetEl = _el('div', {
+            className: 'tacta-sql-saved-item-snippet',
+            textContent: snippet,
+            title: entry.query
+        });
+
+        var loadBtn = _el('button', {
+            className: 'tacta-sql-saved-item-load',
+            title: 'Load into editor'
+        }, [
+            _el('div', { className: 'tacta-sql-saved-item-top' }, [nameEl, metaEl]),
+            snippetEl
+        ]);
+        loadBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (_editorEl) {
+                _editorEl.value = entry.query;
+                _editorEl.focus();
+            }
+            _closeSavedDropdown();
+        });
+
+        var deleteBtn = _el('button', {
+            className: 'tacta-sql-saved-item-delete',
+            title: 'Delete saved query',
+            innerHTML: '&#10005;'
+        });
+        deleteBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _deleteSavedQuery(entry.id);
+            _renderSaved();
+        });
+
+        return _el('div', { className: 'tacta-sql-saved-item' }, [loadBtn, deleteBtn]);
     }
 
     function _toggleHistory() {
@@ -533,6 +860,7 @@
         }
 
         _addToHistory(query);
+        _touchSavedLastRun(query);
         _showStatus('Executing...', '');
         _showResultsLoading();
 
@@ -683,6 +1011,15 @@
             _exportResultsCSV();
         });
 
+        var exportJsonBtn = _el('button', {
+            className: 'tacta-btn tacta-btn-sm',
+            textContent: 'Export JSON',
+            title: 'Download result rows as a JSON array'
+        });
+        exportJsonBtn.addEventListener('click', function () {
+            _exportResultsJSON();
+        });
+
         var copyQueryBtn = _el('button', {
             className: 'tacta-btn tacta-btn-sm',
             textContent: 'Copy Query'
@@ -691,7 +1028,7 @@
             _copyCurrentQuery();
         });
 
-        var actionsRow = _el('div', { className: 'tacta-sql-results-actions' }, [exportBtn, copyQueryBtn]);
+        var actionsRow = _el('div', { className: 'tacta-sql-results-actions' }, [exportBtn, exportJsonBtn, copyQueryBtn]);
         _resultsHost.appendChild(actionsRow);
     }
 
@@ -702,10 +1039,24 @@
         }
 
         var csv = _generateCSV(_suiteqlResults.columns, _suiteqlResults.rows);
-        var timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-        _downloadFile(csv, 'suiteql-results-' + timestamp + '.csv', 'text/csv;charset=utf-8;');
+        _downloadFile(csv, 'suiteql-results-' + _fileTimestamp() + '.csv', 'text/csv;charset=utf-8;');
 
         if (window.TactaDOM) window.TactaDOM.showToast('CSV exported', 'success', 2000);
+    }
+
+    /**
+     * Downloads the current result rows as a pretty-printed JSON array.
+     */
+    function _exportResultsJSON() {
+        if (!_suiteqlResults || !Array.isArray(_suiteqlResults.rows)) {
+            if (window.TactaDOM) window.TactaDOM.showToast('No results to export', 'warning', 2000);
+            return;
+        }
+
+        var json = JSON.stringify(_suiteqlResults.rows, null, 2);
+        _downloadFile(json, 'suiteql-' + _fileTimestamp() + '.json', 'application/json;charset=utf-8;');
+
+        if (window.TactaDOM) window.TactaDOM.showToast('JSON exported', 'success', 2000);
     }
 
     function _copyCurrentQuery() {
@@ -729,9 +1080,13 @@
     // Event Listener — Feature Activation
     // ────────────────────────────────────────────────────────────────
 
+    // detail.data (optional) may carry { query: string, run: boolean } from
+    // another feature that wants to hand a query to the editor. Without it
+    // the panel simply toggles as before.
     window.addEventListener('tacta:featureActivated', function (e) {
         if (e.detail && e.detail.featureId === FEATURE_ID) {
-            _showPanel();
+            var data = e.detail.data;
+            _showPanel(data && typeof data === 'object' ? data : null);
         }
     });
 
