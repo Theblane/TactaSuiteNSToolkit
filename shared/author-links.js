@@ -24,7 +24,7 @@
       { id: 'github',   label: 'Source on GitHub', short: 'GitHub',   url: 'https://github.com/Theblane/TactaSuiteNSToolkit' },
       { id: 'website',  label: 'blanemaher.com',   short: 'Website',  url: 'https://blanemaher.com' },
       { id: 'linkedin', label: 'LinkedIn',         short: 'LinkedIn', url: 'https://www.linkedin.com/in/blanemaher' },
-      { id: 'coffee',   label: 'Buy me a coffee',  short: 'Coffee',   url: '' },
+      { id: 'coffee',   label: 'Buy me a coffee',  short: 'Coffee',   url: 'https://buymeacoffee.com/theblane' },
       { id: 'venmo',    label: 'Venmo',            short: 'Venmo',    url: '' }
     ]
   };
