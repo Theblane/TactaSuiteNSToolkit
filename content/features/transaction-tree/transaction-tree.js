@@ -891,6 +891,11 @@
         var existing = document.getElementById(BADGE_ID);
         if (existing) existing.remove();
 
+        // The Transaction Trail strip shows the chain inline and carries a
+        // "View chain" chip that opens this panel, so the floating bubble
+        // would only duplicate it.
+        if (window.__tactaTransactionTrailLoaded || document.getElementById('tacta-trail-strip')) return;
+
         var badge = document.createElement('div');
         badge.id = BADGE_ID;
         badge.className = 'tacta-tt-badge';
@@ -1061,6 +1066,16 @@
      * Main initialization. Detects if we're on a transaction page and
      * sets up the badge trigger.
      */
+    // Opened from the Transaction Trail strip's "View chain" chip.
+    window.addEventListener('tacta:transactionTree:open', function () {
+        if (_panelOpen) { _closePanel(); } else { _openPanel(); }
+    });
+    // If the trail renders after our bubble appeared, drop the bubble.
+    window.addEventListener('tacta:trail:rendered', function () {
+        var b = document.getElementById(BADGE_ID);
+        if (b) b.remove();
+    });
+
     function _init() {
         if (!_isTransactionPage()) return;
 

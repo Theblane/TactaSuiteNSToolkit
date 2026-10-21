@@ -385,6 +385,33 @@
             first = false;
         }
         flushHidden();
+
+        // The Transaction Tree feature used to float its own "Chain" bubble;
+        // the trail replaces it, so the tree panel opens from here instead.
+        if (window.__tactaTransactionTreeLoaded) {
+            strip.appendChild(buildTreeChip());
+        }
+        window.dispatchEvent(new CustomEvent('tacta:trail:rendered', { detail: { count: list.length } }));
+    }
+
+    function buildTreeChip() {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = SC + '-chip ' + SC + '-chip--tree';
+        btn.title = 'Open the full transaction chain as a tree';
+        btn.setAttribute('aria-label', 'Open transaction tree');
+        var icon = document.createElement('span');
+        icon.className = SC + '-type';
+        icon.textContent = 'TREE';
+        btn.appendChild(icon);
+        var txt = document.createElement('span');
+        txt.className = SC + '-num';
+        txt.textContent = 'View chain';
+        btn.appendChild(txt);
+        btn.addEventListener('click', function () {
+            window.dispatchEvent(new CustomEvent('tacta:transactionTree:open'));
+        });
+        return btn;
     }
 
     /**
@@ -401,6 +428,14 @@
         strip.setAttribute('role', 'navigation');
         strip.setAttribute('aria-label', 'Transaction trail');
 
+        // The record content area starts below NetSuite's fixed header and blue
+        // menu bar, so the top of #div__body is the first spot that cannot be
+        // covered by them. The title containers sit under the fixed bar.
+        var body = document.getElementById('div__body');
+        if (body) {
+            body.insertBefore(strip, body.firstChild);
+            return strip;
+        }
         var title = document.querySelector('.uir-page-title');
         if (title && title.parentNode) {
             title.parentNode.insertBefore(strip, title.nextSibling);
@@ -411,9 +446,9 @@
             divTitle.parentNode.insertBefore(strip, divTitle.nextSibling);
             return strip;
         }
-        var body = document.getElementById('div__body') || document.getElementById('main_form');
-        if (body) {
-            body.insertBefore(strip, body.firstChild);
+        var form = document.getElementById('main_form');
+        if (form) {
+            form.insertBefore(strip, form.firstChild);
             return strip;
         }
         return null;

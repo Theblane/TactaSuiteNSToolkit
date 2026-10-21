@@ -47,7 +47,7 @@
         taxIds: true,
         cards: true,
         currency: true,
-        names: false,
+        names: true,
         customText: '',
         clean: false
     };
@@ -373,20 +373,68 @@
         records.push({ parent: parent, original: textNode, inserted: inserted });
     }
 
-    function maskNames(records) {
-        var sel = '.uir-record-type + h1, a[href*="custjob.nl"], a[href*="entity"]';
-        var els = document.querySelectorAll(sel);
+    var ENTITY_LINK_SEL = 'a[href*="custjob.nl"], a[href*="/entity/"], a[href*="vendor.nl"], a[href*="contact.nl"], ' +
+        'a[href*="employee.nl"], a[href*="partner.nl"], a[href*="otherlists/customer"]';
+    var ENTITY_INPUT_SEL = '#inpt_entity, #inpt_customer, #inpt_vendor, #inpt_employee, #inpt_contact, #inpt_partner, ' +
+        '#inpt_billaddresslist, #inpt_shipaddresslist';
+    var ADDRESS_SEL = '.uir-field-wrapper[data-field-name$="address"] .uir-field-input, ' +
+        '.uir-field-wrapper[data-field-name$="addressee"] .uir-field-input, ' +
+        '#billaddress_fs, #shipaddress_fs, #billaddressee_fs, #shipaddressee_fs, #address_fs, .uir-address, ' +
+        '[id$="address_fs"], [id$="addressee_fs"]';
+
+    function maskWholeElement(elm, records) {
+        var nodes = collectTextNodes(elm);
+        for (var n = 0; n < nodes.length; n++) {
+            var txt = nodes[n].nodeValue;
+            var start = txt.search(/\S/);
+            var end = txt.replace(/\s+$/, '').length;
+            if (start < 0 || end <= start) continue;
+            wrapRanges(nodes[n], [[start, end]], records);
+        }
+    }
+
+    /**
+     * Names worth masking: the record's entity name in the header, every
+     * customer / vendor / employee / contact link, and the entity field value
+     * (view or edit mode). A name that starts with an id ("534921 Acme Corp")
+     * is also added without the id so a bare mention elsewhere is caught.
+     */
+    function collectEntityNames() {
+        var names = [];
+        function add(t) {
+            t = String(t || '').replace(/\s+/g, ' ').trim();
+            if (t.length < 3 || names.indexOf(t) !== -1) return;
+            names.push(t);
+            var m = t.match(/^\d+\s+(.{3,})$/);
+            if (m && names.indexOf(m[1]) === -1) names.push(m[1]);
+        }
+        var rn = document.querySelector('.uir-record-name');
+        if (rn) add(rn.textContent);
+        var links = document.querySelectorAll(ENTITY_LINK_SEL);
+        for (var i = 0; i < links.length; i++) {
+            if (links[i].closest('#ns_header, #ns_navigation, .ns-header, #' + HOST_ID)) continue;
+            add(links[i].textContent);
+        }
+        var ew = document.querySelector('.uir-field-wrapper[data-field-name="entity"] .uir-field-input, .uir-field-wrapper[data-field-name="customer"] .uir-field-input');
+        if (ew) add(ew.textContent);
+        var inputs = document.querySelectorAll(ENTITY_INPUT_SEL);
+        for (var k = 0; k < inputs.length; k++) add(inputs[k].value);
+        return names;
+    }
+
+    function maskEntities(records, matchers) {
+        var names = collectEntityNames();
+        if (names.length) {
+            names.sort(function (a, b) { return b.length - a.length; });
+            // Every occurrence anywhere on the page (memo, sublists, titles), plus inputs via maskInputs.
+            matchers.push({ re: new RegExp(names.map(escapeRegExp).join('|'), 'gi') });
+        }
+        // Black out the header name, entity links and address blocks wholesale.
+        var els = document.querySelectorAll('.uir-record-name, ' + ENTITY_LINK_SEL + ', ' + ADDRESS_SEL);
         for (var i = 0; i < els.length; i++) {
             var elm = els[i];
             if (elm.closest('#ns_header, #ns_navigation, .ns-header, #' + HOST_ID)) continue;
-            var nodes = collectTextNodes(elm);
-            for (var n = 0; n < nodes.length; n++) {
-                var txt = nodes[n].nodeValue;
-                var start = txt.search(/\S/);
-                var end = txt.replace(/\s+$/, '').length;
-                if (start < 0 || end <= start) continue;
-                wrapRanges(nodes[n], [[start, end]], records);
-            }
+            maskWholeElement(elm, records);
         }
     }
 
@@ -470,7 +518,8 @@
 
     // ── Capture session (hide UI, clean, mask; then undo) ────────────
 
-    function beginSession(settings, mode) {
+    function beginSession(settings, mode, opts) {
+        opts = opts || {};
         var records = [];
         var layer = null;
         var host = document.getElementById(HOST_ID);
@@ -480,8 +529,8 @@
         var hostHidden = false;
         var scroll = { x: window.scrollX, y: window.scrollY };
 
-        if (panelEl) panelEl.style.visibility = 'hidden';
-        if (host && (mode === 'full' || settings.clean)) {
+        if (panelEl && !opts.keepPanel) panelEl.style.visibility = 'hidden';
+        if (host && !opts.keepPanel && (mode === 'full' || settings.clean)) {
             host.style.visibility = 'hidden';
             hostHidden = true;
         }
@@ -490,7 +539,7 @@
 
         if (settings.mask) {
             var matchers = buildMatchers(settings);
-            if (settings.names) maskNames(records);
+            if (settings.names) maskEntities(records, matchers);
             maskTextNodes(matchers, records);
             layer = maskInputs(matchers);
         }
@@ -502,8 +551,8 @@
                 if (mode === 'full') untagFixedElements();
                 document.body.classList.remove(BODY_CLEAN);
                 if (hostHidden && host) host.style.visibility = prevHostVis;
-                if (panelEl) panelEl.style.visibility = prevPanelVis;
-                scrollToInstant(scroll.x, scroll.y);
+                if (panelEl && !opts.keepPanel) panelEl.style.visibility = prevPanelVis;
+                if (!opts.keepPanel) scrollToInstant(scroll.x, scroll.y);
             }
         };
     }
@@ -539,6 +588,7 @@
 
     function runCapture() {
         if (_busy || !_panel) return;
+        endMaskPreview();
         _busy = true;
         setStatus('Capturing...', '');
         setButtonsDisabled(true);
@@ -696,7 +746,7 @@
             makeCheckbox('taxIds', 'Tax / SSN / EIN ids'),
             makeCheckbox('cards', 'Card numbers'),
             makeCheckbox('currency', 'Currency amounts'),
-            makeCheckbox('names', 'Names of people')
+            makeCheckbox('names', 'Customers, vendors and people (incl. addresses)')
         ];
         _ui.maskInputs = subChecks.map(function (c) { return c._input; });
 
@@ -730,8 +780,10 @@
         // Capture
         _ui.captureBtn = el('button', { className: 'tacta-btn tacta-btn-primary', textContent: 'Capture' });
         _ui.captureBtn.addEventListener('click', runCapture);
+        _ui.previewMaskBtn = el('button', { className: 'tacta-btn tacta-btn-sm', textContent: 'Preview masks', title: 'Show on the page what the capture will black out' });
+        _ui.previewMaskBtn.addEventListener('click', toggleMaskPreview);
         _ui.status = el('div', { className: SC + '-status' });
-        body.appendChild(el('div', { className: SC + '-actions' }, [_ui.captureBtn, _ui.status]));
+        body.appendChild(el('div', { className: SC + '-actions' }, [_ui.captureBtn, _ui.previewMaskBtn, _ui.status]));
 
         // Preview (hidden until first capture)
         _ui.previewImg = el('img', { className: SC + '-preview-img', alt: 'Screenshot preview' });
@@ -751,6 +803,30 @@
         ]);
         _ui.preview.style.display = 'none';
         body.appendChild(_ui.preview);
+    }
+
+    // ── Mask preview on the live page ───────────────────────────────
+
+    var _maskPreview = null;
+
+    function toggleMaskPreview() {
+        if (_maskPreview) { endMaskPreview(); return; }
+        if (!_settings.mask) { setStatus('Turn on Privacy mask first.', 'error'); return; }
+        try {
+            _maskPreview = beginSession(_settings, 'visible', { keepPanel: true });
+            if (_ui.previewMaskBtn) _ui.previewMaskBtn.textContent = 'Clear preview';
+            setStatus(_maskPreview.maskCount + ' masked on the page. Adjust the options, then Capture.', '');
+        } catch (e) {
+            _maskPreview = null;
+            setStatus('Preview failed: ' + (e && e.message ? e.message : String(e)), 'error');
+        }
+    }
+
+    function endMaskPreview() {
+        if (!_maskPreview) return;
+        try { _maskPreview.restore(); } catch (_) { /* ignore */ }
+        _maskPreview = null;
+        if (_ui.previewMaskBtn) _ui.previewMaskBtn.textContent = 'Preview masks';
     }
 
     function showPreview(result) {
@@ -821,7 +897,7 @@
                 resizable: true,
                 draggable: true,
                 closeOnClickOutside: false,
-                onClose: function () { _panel = null; _ui = {}; }
+                onClose: function () { endMaskPreview(); _panel = null; _ui = {}; }
             });
             _panel.panel.classList.add(SC);
             buildControls(_panel.body);

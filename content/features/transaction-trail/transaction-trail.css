@@ -15,7 +15,7 @@
     align-items: center;
     gap: 4px;
     box-sizing: border-box;
-    margin: 4px 0 6px 0;
+    margin: 10px 0 6px 0;
     padding: 4px 8px;
     font-family: var(--tacta-font-family, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
     font-size: 12px;
@@ -140,4 +140,11 @@
 .tacta-trail-chip[data-tip]:focus-visible::after {
     opacity: 1;
     transform: translateY(0);
+}
+
+/* Tree chip: opens the Transaction Tree panel (replaces its floating Chain bubble) */
+.tacta-trail-chip--tree {
+    margin-left: 10px;
+    border-style: dashed;
+    cursor: pointer;
 }
