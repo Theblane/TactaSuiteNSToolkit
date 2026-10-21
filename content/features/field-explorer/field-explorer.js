@@ -706,7 +706,10 @@
         if (!_searchTerm) return true;
         var id = (field.id || '').toLowerCase();
         var label = (field.label || '').toLowerCase();
-        return id.indexOf(_searchTerm) >= 0 || label.indexOf(_searchTerm) >= 0;
+        var text = field.text === null || field.text === undefined ? '' : String(field.text).toLowerCase();
+        var value = field.value === null || field.value === undefined ? '' : String(field.value).toLowerCase();
+        return id.indexOf(_searchTerm) >= 0 || label.indexOf(_searchTerm) >= 0 ||
+            text.indexOf(_searchTerm) >= 0 || value.indexOf(_searchTerm) >= 0;
     }
 
     /**
@@ -1148,29 +1151,41 @@
 
         // ── Source record link for select/list fields ──────────────────
         var isSelectType2 = /select|list\/record|multi-select/i.test(field.type || '');
-        if (isSelectType2 && field.value) {
+        if (isSelectType2 && (field.value || field.sourceUrl)) {
             var sourceSection = TactaDOM.createElement('div', {
                 className: 'tacta-fe-source-section'
             });
             details.appendChild(sourceSection);
 
-            _sendToBackground({ action: 'getFieldSourceLink', fieldId: field.id })
-                .then(function (linkData) {
-                    if (!linkData || !linkData.sourceUrl) return;
-                    var linkRow = TactaDOM.createElement('div', { className: 'tacta-fe-detail-row' }, [
-                        TactaDOM.createElement('span', { className: 'tacta-fe-detail-key', textContent: 'Source Record' }),
-                        TactaDOM.createElement('a', {
-                            className: 'tacta-fe-link',
-                            textContent: 'Open Source',
-                            href: linkData.sourceUrl + (linkData.sourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'id=' + field.value,
-                            target: '_blank'
-                        })
-                    ]);
-                    sourceSection.appendChild(linkRow);
-                })
-                .catch(function () {
-                    // Silently fail — source link is optional
-                });
+            var appendSourceRow = function (href) {
+                var linkRow = TactaDOM.createElement('div', { className: 'tacta-fe-detail-row' }, [
+                    TactaDOM.createElement('span', { className: 'tacta-fe-detail-key', textContent: 'Source Record' }),
+                    TactaDOM.createElement('a', {
+                        className: 'tacta-fe-link',
+                        textContent: field.text ? 'Open ' + String(field.text).slice(0, 40) : 'Open Source',
+                        href: href,
+                        target: '_blank'
+                    })
+                ]);
+                sourceSection.appendChild(linkRow);
+            };
+
+            if (field.sourceUrl) {
+                // View mode: the page already rendered the link to the source record.
+                appendSourceRow(field.sourceUrl);
+            } else {
+                _sendToBackground({ action: 'getFieldSourceLink', fieldId: field.id })
+                    .then(function (linkData) {
+                        if (!linkData || !linkData.sourceUrl) return;
+                        var href = linkData.direct
+                            ? linkData.sourceUrl
+                            : linkData.sourceUrl + (linkData.sourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'id=' + field.value;
+                        appendSourceRow(href);
+                    })
+                    .catch(function () {
+                        // Source link is optional
+                    });
+            }
         }
 
         return details;

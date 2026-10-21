@@ -117,6 +117,14 @@ const FIXTURE_HTML = `<!doctype html><html><body>
     </tr>
   </table>
   <input type="hidden" name="custbody_hidden_input" id="custbody_hidden_input" value="hv">
+  <!-- View-mode list/record field: no input at all, NetSuite renders the display
+       text as a link to the source record and stamps data-field-name on the wrapper. -->
+  <div class="uir-field-wrapper" data-field-type="select" data-field-name="custbody_viewsel" data-mode="view" data-nsps-label="Vendor">
+    <span id="custbody_viewsel_fs_lbl_uir_label" class="uir-label"><span id="custbody_viewsel_fs_lbl" class="uir-label-span smallgraytextnolink">Vendor</span></span>
+    <span class="uir-field inputreadonly" data-field-type="select">
+      <span class="inputreadonly uir-field-input" data-fieldtype="select" data-mode="view"><a id="qsTarget_1" class="dottedlink" href="/app/common/entity/vendor.nl?id=77">Widget Corp<span style="padding-left:5px"></span></a></span>
+    </span>
+  </div>
   <!-- Form header: the quick-find box is not a field. -->
   <div class="uir-form-header"><div id="uir-quickfind-box" class="uir-quickfind"><div><input type="text" id="quickfind-field" name="quickfind-field"></div></div></div>
   <!-- Inline-HTML field (NetSuite Sticky Notes) whose widget markup carries its own
@@ -380,6 +388,12 @@ test.describe('feGetRecordFieldsFn', () => {
 
         // Fields NetSuite rendered are still found through their wrappers.
         expect(byId(result.bodyFields, 'entity')).toMatchObject({ type: 'List/Record', label: 'Customer', isHidden: false });
+        // View-mode list/record: the API knows nothing, so text comes from the
+        // rendered link, the value from its id= and the link itself is kept.
+        expect(byId(result.bodyFields, 'custbody_viewsel')).toMatchObject({
+            type: 'List/Record', label: 'Vendor', value: '77', text: 'Widget Corp',
+            sourceUrl: '/app/common/entity/vendor.nl?id=77', isHidden: false
+        });
         expect(byId(result.bodyFields, 'custpage_stick')).toMatchObject({ type: 'Inline HTML', label: 'Sticky Notes', isHidden: false });
         expect(byId(result.bodyFields, 'custbody_quirk')).toMatchObject({ isHidden: false });
 

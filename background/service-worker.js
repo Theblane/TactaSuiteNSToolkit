@@ -620,6 +620,12 @@ function feGetRecordFieldsFn() {
     return false;
   }
   function wrapperFieldId(w) {
+    // NetSuite stamps the field id on the wrapper itself in view mode.
+    const stamped = normalizeBodyFieldId(w.getAttribute('data-field-name') || '');
+    if (stamped) {
+      const stampedLbl = w.querySelector('[id$="_fs_lbl"], [id$="_lbl"]');
+      return { fid: stamped, lblEl: stampedLbl || null };
+    }
     const selectors = ['[id$="_fs_lbl"]', '[id$="_lbl"]', '[id$="_uir_label"]'];
     for (let i = 0; i < selectors.length; i++) {
       const lblEl = w.querySelector(selectors[i]);
@@ -652,11 +658,33 @@ function feGetRecordFieldsFn() {
         const lblFallback = w.querySelector('.smalltextnolink, .uir-label span, .uir-label, label');
         if (lblFallback) label = cleanLabel(lblFallback.textContent);
       }
+      // What NetSuite rendered as the value: in view mode a .uir-field-input
+      // span (list/record fields hold a link to the source record), in edit
+      // mode the readonly inpt_<id> display input of a dropdown.
+      let displayText = '';
+      let sourceHref = '';
+      let hrefId = '';
+      const valueSpan = w.querySelector('.uir-field-input, .uir-field');
+      if (valueSpan && !valueSpan.querySelector('input:not([type="hidden"]), select, textarea')) {
+        const link = valueSpan.querySelector('a[href^="/app/"], a[href^="https://"]');
+        if (link) {
+          sourceHref = link.getAttribute('href') || '';
+          const m = sourceHref.match(/[?&]id=(\d+)/);
+          if (m) hrefId = m[1];
+        }
+        displayText = cleanLabel(valueSpan.textContent);
+      }
+      if (!displayText) {
+        const inpt = w.querySelector('input[id^="inpt_"]');
+        if (inpt && inpt.value) displayText = cleanLabel(inpt.value);
+      }
       if (!map[found.fid]) {
-        map[found.fid] = { type: type, label: label, el: w };
+        map[found.fid] = { type: type, label: label, el: w, displayText: displayText, sourceHref: sourceHref, hrefId: hrefId };
       } else {
         if (!map[found.fid].type && type) map[found.fid].type = type;
         if (!map[found.fid].label && label) map[found.fid].label = label;
+        if (!map[found.fid].displayText && displayText) map[found.fid].displayText = displayText;
+        if (!map[found.fid].sourceHref && sourceHref) { map[found.fid].sourceHref = sourceHref; map[found.fid].hrefId = hrefId; }
       }
     }
     return map;
@@ -866,6 +894,12 @@ function feGetRecordFieldsFn() {
       }
       if (value === null) value = ss1Value(fid);
       if (text === null) text = textOrNull(ss1Text(fid));
+      // View mode: the APIs return nothing, but NetSuite rendered the display
+      // text (and, for list/record fields, a link whose id= is the value).
+      if (dom) {
+        if ((value === null || value === undefined || value === '') && dom.hrefId) value = dom.hrefId;
+        if ((text === null || text === '') && dom.displayText) text = dom.displayText;
+      }
       if (Array.isArray(value)) value = value.join(', ');
       if (value !== null && typeof value === 'object') { try { value = JSON.stringify(value); } catch (_) { value = String(value); } }
       if (text !== null && value !== null && String(text) === String(value)) text = null;
@@ -879,7 +913,8 @@ function feGetRecordFieldsFn() {
         isMandatory: isMandatory,
         isDisabled: isDisabled,
         isHidden: isHidden,
-        hiddenBy: isHidden ? hiddenBy : null
+        hiddenBy: isHidden ? hiddenBy : null,
+        sourceUrl: dom && dom.sourceHref ? dom.sourceHref : null
       });
     }
     return out;
@@ -1482,7 +1517,26 @@ function getCustomFieldMetaFn(fieldId) {
 function getFieldSourceLinkFn(fieldId) {
   if (!fieldId) return { fieldId: fieldId, sourceUrl: null };
 
-  var result = { fieldId: fieldId, sourceUrl: null, sourceLabel: null };
+  var result = { fieldId: fieldId, sourceUrl: null, sourceLabel: null, direct: false };
+
+  // Method 0: In view mode NetSuite renders list/record values as a link to
+  // the source record. That link is complete (includes id=), so use it as is.
+  try {
+    var wrapper = document.querySelector('.uir-field-wrapper[data-field-name="' + fieldId + '"]');
+    if (!wrapper) {
+      var lblEl = document.getElementById(fieldId + '_fs_lbl');
+      wrapper = lblEl ? lblEl.closest('.uir-field-wrapper') : null;
+    }
+    if (wrapper) {
+      var valueLink = wrapper.querySelector('.uir-field-input a[href^="/app/"], .uir-field a[href^="/app/"]');
+      if (valueLink) {
+        result.sourceUrl = valueLink.getAttribute('href');
+        result.sourceLabel = (valueLink.textContent || '').trim();
+        result.direct = true;
+        return result;
+      }
+    }
+  } catch(_) {}
 
   // Method 1: Try the Sync function pattern (reference extension approach)
   try {
