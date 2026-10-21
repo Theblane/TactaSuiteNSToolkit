@@ -10,6 +10,9 @@
 (function () {
   'use strict';
 
+  // NetSuite also serves XML views (record URL + xml=T) under /app/*. Those
+  // documents have no HTML elements, so nothing here can run safely.
+  if (!(document.documentElement instanceof HTMLElement)) return;
   if (window.__tactaRouterLoaded) return;
   window.__tactaRouterLoaded = true;
   window.__tactaActivatedFeatures = window.__tactaActivatedFeatures || new Set();

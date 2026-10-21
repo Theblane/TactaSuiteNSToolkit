@@ -100,6 +100,8 @@
   function apply(settings) {
     var normalized = normalize(settings);
     var root = document.documentElement;
+    // XML documents (NetSuite record view with xml=T) have no CSSStyleDeclaration.
+    if (!root || !root.style || typeof root.style.setProperty !== 'function') return normalized;
     var schemeVars = SCHEMES[normalized.scheme];
     var rgb = hexToRgb(normalized.accent);
 

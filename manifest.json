@@ -35,7 +35,10 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://*.netsuite.com/app/*", "https://*.oracle.com/app/*"],
+      "matches": [
+        "https://*.netsuite.com/app/*",
+        "https://*.oracle.com/app/*"
+      ],
       "js": [
         "shared/ns-utils.js",
         "shared/storage-utils.js",
@@ -49,47 +52,87 @@
         "shared/theme-vars.css",
         "shared/tactasuite-ui.css"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     },
     {
       "matches": [
         "https://*.netsuite.com/app/common/search/search.nl*",
         "https://*.oracle.com/app/common/search/search.nl*"
       ],
-      "js": ["content/feature-loader.js"],
-      "run_at": "document_idle"
+      "js": [
+        "content/feature-loader.js"
+      ],
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     },
     {
       "matches": [
         "https://*.netsuite.com/app/common/search/searchresults.nl*",
         "https://*.oracle.com/app/common/search/searchresults.nl*"
       ],
-      "js": ["content/feature-loader.js"],
-      "run_at": "document_idle"
+      "js": [
+        "content/feature-loader.js"
+      ],
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     },
     {
       "matches": [
         "https://*.netsuite.com/app/accounting/transactions/*",
         "https://*.oracle.com/app/accounting/transactions/*"
       ],
-      "js": ["content/feature-loader.js"],
-      "run_at": "document_idle"
+      "js": [
+        "content/feature-loader.js"
+      ],
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     },
     {
       "matches": [
         "https://*.netsuite.com/app/common/scripting/script.nl*",
         "https://*.oracle.com/app/common/scripting/script.nl*"
       ],
-      "js": ["content/feature-loader.js"],
-      "run_at": "document_idle"
+      "js": [
+        "content/feature-loader.js"
+      ],
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     },
     {
       "matches": [
         "https://*.netsuite.com/app/common/workflow/setup/*",
         "https://*.oracle.com/app/common/workflow/setup/*"
       ],
-      "js": ["content/feature-loader.js"],
-      "run_at": "document_idle"
+      "js": [
+        "content/feature-loader.js"
+      ],
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     },
     {
       "matches": [
@@ -98,8 +141,15 @@
         "https://*.oracle.com/app/common/dataset/*",
         "https://*.oracle.com/app/common/workbook/*"
       ],
-      "js": ["content/feature-loader.js"],
-      "run_at": "document_idle"
+      "js": [
+        "content/feature-loader.js"
+      ],
+      "run_at": "document_idle",
+      "exclude_globs": [
+        "*xml=T*",
+        "*xml=true*",
+        "*xml=True*"
+      ]
     }
   ],
   "web_accessible_resources": [
@@ -112,7 +162,10 @@
         "content/features/**/*.css",
         "content/features/ns-utils/nav-search/nav-search-pages.js"
       ],
-      "matches": ["https://*.netsuite.com/*", "https://*.oracle.com/*"]
+      "matches": [
+        "https://*.netsuite.com/*",
+        "https://*.oracle.com/*"
+      ]
     }
   ]
 }
