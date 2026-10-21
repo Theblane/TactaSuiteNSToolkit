@@ -113,8 +113,16 @@
         await loadQscSettings();
         await loadUserType();
         mountAiSettings();
+        renderAuthor();
         bindEvents();
         scrollToHash();
+    }
+
+    /** Author name, role and support links in About (shared/author-links.js). */
+    function renderAuthor() {
+        const mount = document.getElementById('authorMount');
+        if (!mount || !window.TactaAuthor) return;
+        window.TactaAuthor.render(mount, { variant: 'full' });
     }
 
     /** Deep links such as options.html#ai land on the matching section. */

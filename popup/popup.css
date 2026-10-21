@@ -791,3 +791,69 @@ body.meeting-mode .tacta-active-features {
     color: var(--tacta-text-inverse);
     background: var(--tacta-accent-hover);
 }
+
+/* ── Author / support links (shared/author-links.js) ───────────── */
+
+.tacta-author-name {
+    font-weight: 600;
+    color: var(--tacta-text);
+}
+
+.tacta-author-prefix {
+    font-weight: 400;
+    color: var(--tacta-text-muted);
+}
+
+.tacta-author-role {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--tacta-text-muted);
+}
+
+.tacta-author-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tacta-author-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--tacta-text-secondary);
+    background: var(--tacta-bg);
+    border: 1px solid var(--tacta-border);
+    border-radius: var(--tacta-radius-full);
+    text-decoration: none;
+}
+
+.tacta-author-link:hover {
+    color: var(--tacta-accent);
+    border-color: var(--tacta-accent);
+    background: var(--tacta-accent-muted);
+}
+
+.tacta-author--compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tacta-author--compact .tacta-author-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--tacta-text-muted);
+}
+
+.tacta-author--compact .tacta-author-links {
+    margin-top: 0;
+    gap: 4px;
+}
+
+.tacta-author--compact .tacta-author-link {
+    padding: 3px;
+    border-radius: var(--tacta-radius-sm);
+}

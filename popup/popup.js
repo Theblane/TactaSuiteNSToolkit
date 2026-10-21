@@ -133,6 +133,14 @@
         bindEvents();
         updateMeetingModeUI();
         await loadSettingsPanel();
+        renderAuthor();
+    }
+
+    /** Author name and support links in the footer (shared/author-links.js). */
+    function renderAuthor() {
+        const mount = document.getElementById('authorMount');
+        if (!mount || !window.TactaAuthor) return;
+        window.TactaAuthor.render(mount, { variant: 'compact', prefix: 'by' });
     }
 
     async function loadState() {

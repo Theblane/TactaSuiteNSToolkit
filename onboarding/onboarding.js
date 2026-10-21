@@ -701,6 +701,13 @@
         actions.appendChild(closeBtn);
         actions.appendChild(againBtn);
         $step.appendChild(actions);
+
+        // Who made this, with source and support links (shared/author-links.js)
+        if (window.TactaAuthor) {
+            const credit = el('div', 'tacta-ob-credit');
+            window.TactaAuthor.render(credit, { variant: 'full', prefix: 'Made by' });
+            $step.appendChild(credit);
+        }
     }
 
 
