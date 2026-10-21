@@ -141,7 +141,7 @@ Also affirm:
 - ☑ I do not use or transfer user data for purposes unrelated to the item's single purpose.
 - ☑ I do not use or transfer user data to determine creditworthiness or for lending purposes.
 
-**Privacy policy URL:** Host `PRIVACY.md` somewhere public (GitHub repo, GitHub Pages, your domain) and paste that URL into the listing form. The in-repo file alone is not enough - CWS requires a URL.
+**Privacy policy URL:** `https://github.com/Theblane/TactaSuiteNSToolkit/blob/main/PRIVACY.md` (once the repo is pushed and public). CWS requires a reachable URL, so push before submitting.
 
 ---
 

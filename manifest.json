@@ -4,6 +4,7 @@
   "version": "1.2.0",
   "description": "Unified NetSuite developer toolkit — field explorer, search export, script analysis, and 30+ productivity tools.",
   "author": "Blane Maher",
+  "homepage_url": "https://github.com/Theblane/TactaSuiteNSToolkit",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

@@ -65,6 +65,8 @@ On first install a setup walkthrough opens. It asks whether you are a Traditiona
 
 *(Once published - link will be added here.)*
 
+Source: [github.com/Theblane/TactaSuiteNSToolkit](https://github.com/Theblane/TactaSuiteNSToolkit)
+
 ### Manual / Unpacked (development)
 
 1. Clone or download this repository.
