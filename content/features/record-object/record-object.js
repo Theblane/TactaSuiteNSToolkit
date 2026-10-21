@@ -1,6 +1,6 @@
 /**
  * record-object.js
- * TactaSuite NS Toolkit - Record Object Viewer (Content Script)
+ * NetSuite TactaSuite - Record Object Viewer (Content Script)
  *
  * @author Blane Maher
  *
@@ -12,7 +12,7 @@
  * Activation: popup message dispatches 'tacta:featureActivated' event
  * with featureId 'record-object'.
  *
- * @fileoverview Record Object Viewer content script for the TactaSuite NS Toolkit.
+ * @fileoverview Record Object Viewer content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

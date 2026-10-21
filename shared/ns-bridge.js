@@ -1,6 +1,6 @@
 /**
  * ns-bridge.js
- * TactaSuite NS Toolkit - Content Script <-> Page World Messaging Bridge
+ * NetSuite TactaSuite - Content Script <-> Page World Messaging Bridge
  *
  * @author Blane Maher
  *
@@ -29,7 +29,7 @@
  *
  * Exposes: window.TactaNSBridge
  *
- * @fileoverview Page-world messaging bridge for the TactaSuite NS Toolkit.
+ * @fileoverview Page-world messaging bridge for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

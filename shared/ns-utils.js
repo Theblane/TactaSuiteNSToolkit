@@ -1,6 +1,6 @@
 /**
  * ns-utils.js
- * TactaSuite NS Toolkit - NetSuite Utility Functions
+ * NetSuite TactaSuite - NetSuite Utility Functions
  *
  * @author Blane Maher
  *

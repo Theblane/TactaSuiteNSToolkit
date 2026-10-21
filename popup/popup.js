@@ -1,6 +1,6 @@
 /**
  * popup.js
- * TactaSuite NS Toolkit — Popup Controller
+ * NetSuite TactaSuite — Popup Controller
  *
  * @author Blane Maher
  *

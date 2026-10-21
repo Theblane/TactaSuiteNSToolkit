@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit — NetSuite Page Detector
+ * NetSuite TactaSuite — NetSuite Page Detector
  *
  * @author Blane Maher
  */

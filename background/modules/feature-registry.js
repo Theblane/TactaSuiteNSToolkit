@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit — Feature Registry
+ * NetSuite TactaSuite — Feature Registry
  *
  * @author Blane Maher
  *

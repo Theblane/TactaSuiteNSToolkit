@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit - Context Menu Manager
+ * NetSuite TactaSuite - Context Menu Manager
  *
  * @author Blane Maher
  */
@@ -8,7 +8,7 @@ export function setupContextMenus(): void {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'tacta-toolkit-parent',
-      title: 'TactaSuite NS Toolkit',
+      title: 'NetSuite TactaSuite',
       contexts: ['page', 'editable', 'link'],
       documentUrlPatterns: ['https://*.netsuite.com/*']
     });

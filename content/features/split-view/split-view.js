@@ -1,6 +1,6 @@
 /**
  * split-view.js
- * TactaSuite NS Toolkit - Split View (Content Script, Context Menu Trigger)
+ * NetSuite TactaSuite - Split View (Content Script, Context Menu Trigger)
  *
  * @author Blane Maher
  *
@@ -16,7 +16,7 @@
  * Activated by the `tacta:featureActivated` custom event with featureId
  * 'split-view', dispatched by the router after a context-menu click.
  *
- * @fileoverview Split View content script for the TactaSuite NS Toolkit.
+ * @fileoverview Split View content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

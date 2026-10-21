@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit — Background Service Worker
+ * NetSuite TactaSuite — Background Service Worker
  *
  * @author Blane Maher
  */

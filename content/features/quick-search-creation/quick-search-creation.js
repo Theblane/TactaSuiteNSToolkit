@@ -1,6 +1,6 @@
 /**
  * quick-search-creation.js
- * TactaSuite NS Toolkit - Quick Search (Real-Time Global Record Search)
+ * NetSuite TactaSuite - Quick Search (Real-Time Global Record Search)
  *
  * @author Blane Maher
  *
@@ -13,7 +13,7 @@
  * Secondary "Create new search" links are shown at the bottom of results
  * to preserve the original functionality.
  *
- * @fileoverview Quick Search content script for the TactaSuite NS Toolkit.
+ * @fileoverview Quick Search content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

@@ -1,6 +1,6 @@
 /**
  * nav-search-pages.js
- * TactaSuite NS Toolkit — Navigation Search Page Data
+ * NetSuite TactaSuite — Navigation Search Page Data
  *
  * @author Blane Maher
  *

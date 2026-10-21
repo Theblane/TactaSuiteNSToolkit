@@ -1,6 +1,6 @@
 /**
  * options.js
- * TactaSuite NS Toolkit — Options Page Controller
+ * NetSuite TactaSuite — Options Page Controller
  *
  * @author Blane Maher
  *
@@ -217,7 +217,7 @@
         const themeData = await chrome.storage.local.get('tacta_theme_settings');
         const payload = {
             _meta: {
-                extension:  'TactaSuite NS Toolkit',
+                extension:  'NetSuite TactaSuite',
                 version:    chrome.runtime.getManifest().version,
                 exportedAt: new Date().toISOString(),
             },

@@ -1,6 +1,6 @@
 /**
  * audit-trail.js
- * TactaSuite NS Toolkit - Audit Trail Panel (Content Script)
+ * NetSuite TactaSuite - Audit Trail Panel (Content Script)
  *
  * @author Blane Maher
  *

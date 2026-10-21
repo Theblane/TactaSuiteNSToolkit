@@ -1,11 +1,11 @@
-# Privacy Policy — TactaSuite NS Toolkit
+# Privacy Policy — NetSuite TactaSuite
 
 **Author:** Blane Maher
 **Last updated:** 2026-05-22
 
 ## Summary
 
-TactaSuite NS Toolkit ("the extension") does not collect, transmit, or sell any user data. It does not contact any remote server controlled by the developer or any third party. All settings and state are stored locally on your device.
+NetSuite TactaSuite ("the extension") does not collect, transmit, or sell any user data. It does not contact any remote server controlled by the developer or any third party. All settings and state are stored locally on your device.
 
 ## What the extension stores
 

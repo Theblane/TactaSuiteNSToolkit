@@ -1,6 +1,6 @@
 /**
  * field-explorer.js
- * TactaSuite NS Toolkit - Field Explorer (Content Script)
+ * NetSuite TactaSuite - Field Explorer (Content Script)
  *
  * @author Blane Maher
  *
@@ -10,7 +10,7 @@
  *
  * Activation: popup message 'activateFeature' with featureId 'field-explorer'.
  *
- * @fileoverview Field Explorer content script for the TactaSuite NS Toolkit.
+ * @fileoverview Field Explorer content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

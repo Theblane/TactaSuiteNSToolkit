@@ -1,6 +1,6 @@
 /**
  * nav-search.js
- * TactaSuite NS Toolkit — Navigation Search (Content Script)
+ * NetSuite TactaSuite — Navigation Search (Content Script)
  *
  * @author Blane Maher
  *

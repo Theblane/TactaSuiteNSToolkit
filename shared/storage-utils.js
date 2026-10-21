@@ -1,6 +1,6 @@
 /**
  * storage-utils.js
- * TactaSuite NS Toolkit - Chrome Storage Wrapper
+ * NetSuite TactaSuite - Chrome Storage Wrapper
  *
  * @author Blane Maher
  *
@@ -10,7 +10,7 @@
  *
  * Exposes: window.TactaStorage
  *
- * @fileoverview Chrome storage utilities for the TactaSuite NS Toolkit.
+ * @fileoverview Chrome storage utilities for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

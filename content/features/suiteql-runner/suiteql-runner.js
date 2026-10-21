@@ -1,6 +1,6 @@
 /**
  * suiteql-runner.js
- * TactaSuite NS Toolkit - SuiteQL Runner (Content Script)
+ * NetSuite TactaSuite - SuiteQL Runner (Content Script)
  *
  * @author Blane Maher
  *
@@ -9,7 +9,7 @@
  *
  * Activation: 'tacta:featureActivated' custom event with featureId 'suiteql-runner'.
  *
- * @fileoverview SuiteQL Runner content script for the TactaSuite NS Toolkit.
+ * @fileoverview SuiteQL Runner content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

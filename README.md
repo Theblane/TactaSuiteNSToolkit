@@ -1,4 +1,4 @@
-# TactaSuite NS Toolkit
+# NetSuite TactaSuite
 
 A unified NetSuite developer and administrator productivity toolkit, delivered as a Chrome extension (Manifest V3).
 
@@ -9,7 +9,7 @@ A unified NetSuite developer and administrator productivity toolkit, delivered a
 
 ## What it does
 
-TactaSuite NS Toolkit adds a single popup to NetSuite tabs that exposes a curated set of developer and admin features. Each feature can be toggled on or off independently, and a "Meeting Mode" toggle suppresses every visual modification at once so the UI looks stock during screen shares.
+NetSuite TactaSuite adds a single popup to NetSuite tabs that exposes a curated set of developer and admin features. Each feature can be toggled on or off independently, and a "Meeting Mode" toggle suppresses every visual modification at once so the UI looks stock during screen shares.
 
 ## Features
 

@@ -1,6 +1,6 @@
 /**
  * csv-template-generator.js
- * TactaSuite NS Toolkit - CSV Template Generator (Content Script)
+ * NetSuite TactaSuite - CSV Template Generator (Content Script)
  *
  * @author Blane Maher
  *

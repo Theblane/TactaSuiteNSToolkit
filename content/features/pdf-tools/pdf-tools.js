@@ -1,6 +1,6 @@
 /**
  * pdf-tools.js
- * TactaSuite NS Toolkit — PDF Tools (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite — PDF Tools (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *

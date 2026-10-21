@@ -1,6 +1,6 @@
 /**
  * csv-viewer.js
- * TactaSuite NS Toolkit - CSV Import Viewer
+ * NetSuite TactaSuite - CSV Import Viewer
  *
  * @author Blane Maher
  *
@@ -8,7 +8,7 @@
  * NetSuite CSV import pages. Reads the file from the file input,
  * parses it, and displays a searchable/scrollable preview table.
  *
- * @fileoverview CSV Viewer content script for the TactaSuite NS Toolkit.
+ * @fileoverview CSV Viewer content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

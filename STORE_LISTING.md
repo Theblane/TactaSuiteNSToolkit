@@ -1,6 +1,6 @@
 # Chrome Web Store Submission Notes
 
-Reference material for submitting **TactaSuite NS Toolkit** to the Chrome Web Store. Everything below is copy-paste-ready for the CWS developer dashboard, except the image assets, which still need to be captured by hand (see the Screenshots Checklist).
+Reference material for submitting **NetSuite TactaSuite** to the Chrome Web Store. Everything below is copy-paste-ready for the CWS developer dashboard, except the image assets, which still need to be captured by hand (see the Screenshots Checklist).
 
 **Publisher:** Blane Maher (use the Blane Maher–owned developer account)
 **Category suggestion:** Developer Tools (or Productivity if Developer Tools isn't available for the listing region)
@@ -26,7 +26,7 @@ Single-purpose statements that mention "and 30+ productivity tools" or read like
 
 ## Detailed Description
 
-> **TactaSuite NS Toolkit** is a unified Chrome extension that adds developer and admin productivity tools to NetSuite (`*.netsuite.com`). It replaces a dozen single-purpose extensions with one curated, themeable toolkit.
+> **NetSuite TactaSuite** is a unified Chrome extension that adds developer and admin productivity tools to NetSuite (`*.netsuite.com`). It replaces a dozen single-purpose extensions with one curated, themeable toolkit.
 >
 > **Developer features**
 > • Field Explorer — inspect every field on a record: IDs, types, values, sublist columns.
@@ -141,7 +141,7 @@ For each shot: open the extension in Chrome on a real NetSuite sandbox page, tak
 | 2 | `screenshot-2-field-explorer.png` | Field Explorer panel open on a Sales Order or Customer record. | The panel should be docked or floating with at least 10 fields visible — show field ID, type, value columns. |
 | 3 | `screenshot-3-suiteql-runner.png` | SuiteQL Runner with a sample query and results rendered. | Use a benign query like `SELECT id, tranid, trandate FROM transaction WHERE rownum <= 10`. Show the results table and the "Export CSV" button. |
 | 4 | `screenshot-4-saved-search-export.png` | A NetSuite saved search results page with the export toolbar visible. | Capture the CSV / JSON / Copy buttons injected above the results table. Use a sandbox saved search. |
-| 5 | `screenshot-5-options.png` | The full-page Options screen. | Show the feature toggles section and at least one settings section (Theme or Quick Search). Title bar should say "TactaSuite NS Toolkit — Settings". |
+| 5 | `screenshot-5-options.png` | The full-page Options screen. | Show the feature toggles section and at least one settings section (Theme or Quick Search). Title bar should say "NetSuite TactaSuite — Settings". |
 
 **Format & safety**
 - File type: PNG, 24-bit (or JPG if file size matters).
@@ -167,7 +167,7 @@ CWS accepts three promo tile sizes. **Small** is the only required-ish one; the 
 - Background: solid `#1a1a1a` (the TactaSuite dark tone) or a subtle gradient toward `#222222`.
 - Primary accent: `#76c043` (the TactaSuite green) — use sparingly: logo mark, headline underline, a single highlight.
 - Logo mark: a green `#76c043` rounded square containing a bold white **T**, sized about 88px tall on the 440×280 tile. The popup header uses the same mark — match its proportions.
-- Headline copy (440×280): **TactaSuite NS Toolkit** on one line, white, semibold, ~28px.
+- Headline copy (440×280): **NetSuite TactaSuite** on one line, white, semibold, ~28px.
 - Sub-copy (440×280): "NetSuite developer & admin productivity, all in one." white at 60% opacity, ~14px.
 - Optional: a faint outline of a NetSuite page or a stylized SQL/JSON snippet behind the text, kept at low opacity so the headline stays legible.
 - No customer or company names, no NetSuite logo, no Chrome logo.

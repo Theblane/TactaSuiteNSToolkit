@@ -1,6 +1,6 @@
 /**
  * better-page-titles.js
- * TactaSuite NS Toolkit — Better Page Titles (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite — Better Page Titles (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *

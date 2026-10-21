@@ -1,6 +1,6 @@
 /**
  * theme-manager.ts
- * TactaSuite NS Toolkit - Theme Manager
+ * NetSuite TactaSuite - Theme Manager
  *
  * @author Blane Maher
  *

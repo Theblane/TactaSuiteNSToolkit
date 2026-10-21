@@ -1,6 +1,6 @@
 /**
  * workflow-colors.js
- * TactaSuite NS Toolkit - Workflow Colors (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite - Workflow Colors (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *
@@ -24,7 +24,7 @@
  *
  * Runs automatically on workflow setup pages (/app/common/workflow/setup/*).
  *
- * @fileoverview Workflow Colors content script for the TactaSuite NS Toolkit.
+ * @fileoverview Workflow Colors content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

@@ -1,6 +1,6 @@
 /**
  * fixed-headers.js
- * TactaSuite NS Toolkit - Fixed Headers (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite - Fixed Headers (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *
@@ -18,7 +18,7 @@
  * Runs automatically on record-view, record-edit, search-results, and
  * list pages. No popup activation needed.
  *
- * @fileoverview Fixed Headers content script for the TactaSuite NS Toolkit.
+ * @fileoverview Fixed Headers content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

@@ -1,6 +1,6 @@
 /**
  * ns-bridge.ts
- * TactaSuite NS Toolkit - Content Script <-> Page World Messaging Bridge
+ * NetSuite TactaSuite - Content Script <-> Page World Messaging Bridge
  *
  * @author Blane Maher
  */

@@ -1,6 +1,6 @@
 /**
  * field-help.js
- * TactaSuite NS Toolkit — Field Help (Content Script)
+ * NetSuite TactaSuite — Field Help (Content Script)
  *
  * @author Blane Maher
  *

@@ -1,6 +1,6 @@
 /**
  * console-snippets.js
- * TactaSuite NS Toolkit - Console Snippets (Content Script)
+ * NetSuite TactaSuite - Console Snippets (Content Script)
  *
  * @author Blane Maher
  *

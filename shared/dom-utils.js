@@ -1,6 +1,6 @@
 /**
  * dom-utils.js
- * TactaSuite NS Toolkit - DOM Manipulation Helpers
+ * NetSuite TactaSuite - DOM Manipulation Helpers
  *
  * @author Blane Maher
  *
@@ -10,7 +10,7 @@
  *
  * Exposes: window.TactaDOM
  *
- * @fileoverview DOM builder utilities for the TactaSuite NS Toolkit.
+ * @fileoverview DOM builder utilities for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

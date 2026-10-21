@@ -1,6 +1,6 @@
 /**
  * script-explorer.js
- * TactaSuite NS Toolkit - Script Explorer (Content Script)
+ * NetSuite TactaSuite - Script Explorer (Content Script)
  *
  * @author Blane Maher
  *
@@ -12,7 +12,7 @@
  * Activation: popup message dispatches 'tacta:featureActivated' event
  * with featureId 'script-explorer'.
  *
- * @fileoverview Script Explorer content script for the TactaSuite NS Toolkit.
+ * @fileoverview Script Explorer content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

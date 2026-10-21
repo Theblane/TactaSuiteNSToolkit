@@ -1,6 +1,6 @@
 /**
  * script-analyzer.js
- * TactaSuite NS Toolkit — Script Analyzer (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite — Script Analyzer (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *

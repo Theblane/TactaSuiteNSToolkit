@@ -1,6 +1,6 @@
 /**
  * dom-utils.ts
- * TactaSuite NS Toolkit - DOM Manipulation Helpers
+ * NetSuite TactaSuite - DOM Manipulation Helpers
  *
  * @author Blane Maher
  *

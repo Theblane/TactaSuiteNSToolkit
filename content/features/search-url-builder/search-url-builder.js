@@ -1,6 +1,6 @@
 /**
  * search-url-builder.js
- * TactaSuite NS Toolkit - Search URL Builder (Content Script)
+ * NetSuite TactaSuite - Search URL Builder (Content Script)
  *
  * @author Blane Maher
  *

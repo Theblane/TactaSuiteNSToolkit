@@ -1,6 +1,6 @@
 /**
  * storage-utils.ts
- * TactaSuite NS Toolkit - Chrome Storage Wrapper
+ * NetSuite TactaSuite - Chrome Storage Wrapper
  *
  * @author Blane Maher
  *

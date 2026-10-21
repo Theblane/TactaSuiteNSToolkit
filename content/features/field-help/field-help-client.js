@@ -1,6 +1,6 @@
 /**
  * field-help-client.js
- * TactaSuite NS Toolkit — Field Help (Page World Script)
+ * NetSuite TactaSuite — Field Help (Page World Script)
  *
  * @author Blane Maher
  *

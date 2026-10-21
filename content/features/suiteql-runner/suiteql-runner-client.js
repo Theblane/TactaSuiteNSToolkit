@@ -1,6 +1,6 @@
 /**
  * suiteql-runner-client.js
- * TactaSuite NS Toolkit - SuiteQL Runner Page-World Script
+ * NetSuite TactaSuite - SuiteQL Runner Page-World Script
  *
  * @author Blane Maher
  *

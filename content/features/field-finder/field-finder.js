@@ -1,6 +1,6 @@
 /**
  * field-finder.js (ISOLATED world stub)
- * TactaSuite NS Toolkit - Field Finder
+ * NetSuite TactaSuite - Field Finder
  *
  * @author Blane Maher
  *

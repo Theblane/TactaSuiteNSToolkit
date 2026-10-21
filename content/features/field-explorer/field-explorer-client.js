@@ -1,6 +1,6 @@
 /**
  * field-explorer-client.js
- * TactaSuite NS Toolkit - Field Explorer (Page World Script)
+ * NetSuite TactaSuite - Field Explorer (Page World Script)
  *
  * @author Blane Maher
  *

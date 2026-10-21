@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit — Storage Manager
+ * NetSuite TactaSuite — Storage Manager
  *
  * @author Blane Maher
  *

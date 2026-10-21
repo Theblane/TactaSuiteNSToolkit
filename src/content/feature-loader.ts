@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit - URL Feature Loader
+ * NetSuite TactaSuite - URL Feature Loader
  *
  * @author Blane Maher
  */

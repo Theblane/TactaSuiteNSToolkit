@@ -1,6 +1,6 @@
 /**
  * field-finder-client.js
- * TactaSuite NS Toolkit - Field Finder (PAGE WORLD script)
+ * NetSuite TactaSuite - Field Finder (PAGE WORLD script)
  */
 (function () {
     'use strict';

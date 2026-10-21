@@ -3,7 +3,7 @@ import path from 'path';
 
 const extensionPath = path.resolve(__dirname, '../dist');
 
-test.describe('TactaSuite NS Toolkit', () => {
+test.describe('NetSuite TactaSuite', () => {
     let context: BrowserContext;
 
     test.beforeEach(async () => {

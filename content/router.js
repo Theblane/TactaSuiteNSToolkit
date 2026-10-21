@@ -1,5 +1,5 @@
 /**
- * TactaSuite NS Toolkit - Content Script Router
+ * NetSuite TactaSuite - Content Script Router
  *
  * @author Blane Maher
  *

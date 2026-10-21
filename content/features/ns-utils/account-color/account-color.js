@@ -1,6 +1,6 @@
 /**
  * account-color.js
- * TactaSuite NS Toolkit - Account Color (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite - Account Color (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *
@@ -18,7 +18,7 @@
  *
  * Dismissible per session via sessionStorage.
  *
- * @fileoverview Account Color content script for the TactaSuite NS Toolkit.
+ * @fileoverview Account Color content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';

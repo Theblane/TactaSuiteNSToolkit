@@ -1,6 +1,6 @@
 /**
  * transaction-tree.js
- * TactaSuite NS Toolkit — Transaction Tree (Content Script, Auto-Trigger)
+ * NetSuite TactaSuite — Transaction Tree (Content Script, Auto-Trigger)
  *
  * @author Blane Maher
  *
@@ -16,7 +16,7 @@
  * Runs in the ISOLATED world (content script) with no page-world access
  * needed — all NetSuite data access goes through the service worker.
  *
- * @fileoverview Transaction Tree content script for the TactaSuite NS Toolkit.
+ * @fileoverview Transaction Tree content script for the NetSuite TactaSuite.
  */
 (function () {
     'use strict';
