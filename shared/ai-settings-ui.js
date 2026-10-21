@@ -84,6 +84,11 @@
         '.tacta-ai-set-status.tacta-ai-set-warn { color: var(--tacta-warning); }',
         '.tacta-ai-set-actions { display: flex; align-items: center; gap: var(--tacta-space-sm); flex-wrap: wrap; padding-top: var(--tacta-space-md); }',
         '.tacta-ai-set-result { flex: 1 1 100%; min-height: 18px; font-size: var(--tacta-font-size-sm); line-height: 1.4; }',
+        '.tacta-ai-set-helper { padding: 10px 12px; margin: 6px 0 10px; border: 1px dashed var(--tacta-border, #ccc); border-radius: var(--tacta-radius-md, 6px); background: var(--tacta-bg, #f7f8fa); font-size: 12.5px; }',
+        '.tacta-ai-set-helper p { margin: 0 0 6px; } .tacta-ai-set-helper ol { margin: 6px 0 0 18px; padding: 0; } .tacta-ai-set-helper li { margin: 4px 0; }',
+        '.tacta-ai-set-cmd { display: flex; align-items: center; gap: 8px; margin: 4px 0; } .tacta-ai-set-cmd code { flex: 1; padding: 4px 8px; font-family: var(--tacta-font-mono, monospace); font-size: 12px; background: var(--tacta-bg-elevated, #fff); border: 1px solid var(--tacta-border, #ccc); border-radius: 4px; overflow-x: auto; white-space: nowrap; }',
+        '.tacta-ai-set-muted { color: var(--tacta-text-muted, #666); }',
+        '.tacta-ai-set-pick { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; cursor: pointer; }',
         '.tacta-ai-set-hidden { display: none !important; }',
         '.tacta-ai-set-guide details { border: 1px solid var(--tacta-border); border-radius: var(--tacta-radius-md); margin-top: var(--tacta-space-md); background: var(--tacta-bg-elevated); }',
         '.tacta-ai-set-guide summary { cursor: pointer; padding: var(--tacta-space-sm) var(--tacta-space-md); font-weight: 600; font-size: var(--tacta-font-size-sm); color: var(--tacta-text-secondary); }',
@@ -149,26 +154,34 @@
         return 'https://bedrock-runtime.' + region + '.amazonaws.com/*';
     }
 
-    function permissionsContains(region) {
+    function helperOriginPattern(url) {
+        try { return new URL(url).origin + '/*'; } catch (_) { return 'http://127.0.0.1/*'; }
+    }
+
+    function permissionsContains(origins) {
         return new Promise(function (resolve) {
             if (!chrome.permissions || !chrome.permissions.contains) { resolve(false); return; }
             try {
-                chrome.permissions.contains({ origins: [bedrockOriginPattern(region)] }, function (ok) { resolve(!!ok && !chrome.runtime.lastError); });
+                chrome.permissions.contains({ origins: origins }, function (ok) { resolve(!!ok && !chrome.runtime.lastError); });
             } catch (_) { resolve(false); }
         });
     }
 
-    function permissionsRequest(region) {
+    function permissionsRequest(origins) {
         return new Promise(function (resolve, reject) {
             if (!chrome.permissions || !chrome.permissions.request) { reject(new Error('chrome.permissions is not available here.')); return; }
             try {
-                chrome.permissions.request({ origins: [bedrockOriginPattern(region)] }, function (granted) {
+                chrome.permissions.request({ origins: origins }, function (granted) {
                     if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
                     else resolve(!!granted);
                 });
             } catch (e) { reject(e); }
         });
     }
+
+    var HELPER_DEFAULT_URL = 'http://127.0.0.1:38790';
+    var HELPER_LOGIN_CMD = 'aws sso login --profile aws-code-ai';
+    var HELPER_START_CMD = 'cd tools\\bedrock-token-helper && npm install && npm start';
 
     /**
      * Finds the tab the SW should use for tests: the active NetSuite tab if
@@ -230,7 +243,7 @@
         var root = el('div', { className: 'tacta-ai-set' + (opts.compact ? ' tacta-ai-set-compact' : '') });
         containerEl.appendChild(root);
 
-        var state = { provider: 'none', bedrock: { region: 'us-east-1', modelId: 'us.anthropic.claude-fable-5-1', apiKey: '' }, netsuite: { scriptId: '', deployId: '' }, maskSensitive: true, maxSteps: 8 };
+        var state = { provider: 'none', bedrock: { region: 'us-east-1', modelId: 'us.anthropic.claude-fable-5-1', auth: 'key', helperUrl: HELPER_DEFAULT_URL, apiKey: '' }, netsuite: { scriptId: '', deployId: '' }, maskSensitive: true, maxSteps: 8 };
 
         // ── Provider card ──
         var providerCard = el('div', { className: 'tacta-ai-set-card' }, [
@@ -240,7 +253,7 @@
         var radios = el('div', { className: 'tacta-ai-set-radios' });
         var radioDefs = [
             { value: 'none', title: 'Off', desc: 'AI Assistant shows a setup card only.' },
-            { value: 'bedrock', title: 'Claude on Amazon Bedrock', desc: 'Your AWS account, Bedrock API key. Native tool calling, multi-step.' },
+            { value: 'bedrock', title: 'Claude on Amazon Bedrock', desc: 'Your AWS account: sign in with your existing AWS login (local helper) or paste a Bedrock API key. Native tool calling, multi-step.' },
             { value: 'netsuite', title: 'NetSuite AI (N/llm)', desc: 'Runs inside NetSuite through a RESTlet you deploy. Uses the account\'s NetSuite AI allotment.' }
         ];
         var radioInputs = [];
@@ -269,6 +282,55 @@
         var keyToggle = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Show' });
         var permStatus = el('span', { className: 'tacta-ai-set-status' });
 
+        // Sign-in mode: local helper (your AWS login) or a pasted API key
+        var authHelper = el('input', { type: 'radio', name: 'tacta-ai-bedrock-auth', value: 'helper' });
+        var authKey = el('input', { type: 'radio', name: 'tacta-ai-bedrock-auth', value: 'key' });
+        var helperUrlInput = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: HELPER_DEFAULT_URL, spellcheck: 'false' });
+        var helperStatus = el('span', { className: 'tacta-ai-set-status' });
+        var helperCheckBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Check helper' });
+        function cmdLine(cmd) {
+            var copy = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Copy' });
+            copy.addEventListener('click', function () {
+                copyText(cmd).then(function (ok) { copy.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(function () { copy.textContent = 'Copy'; }, 1800); });
+            });
+            return el('div', { className: 'tacta-ai-set-cmd' }, [el('code', { textContent: cmd }), copy]);
+        }
+        var helperGuide = el('div', { className: 'tacta-ai-set-helper' }, [
+            el('p', { textContent: 'Uses the AWS login already on this computer (Identity Center / SSO, or any AWS CLI profile). A tiny local helper mints a short-term Bedrock token from it when the assistant needs one; tokens expire with your AWS session (12 hours at most) and nothing long-lived is created in AWS. No secret is pasted into the browser.' }),
+            el('ol', null, [
+                el('li', null, ['If your AWS session has expired, sign in again:', cmdLine(HELPER_LOGIN_CMD)]),
+                el('li', null, ['Start the helper from the extension folder (leave the window open while you use the assistant):', cmdLine(HELPER_START_CMD)]),
+                el('li', { textContent: 'Click Save (Chrome asks to allow the extension to reach 127.0.0.1 and Bedrock), then Test.' })
+            ]),
+            el('p', { className: 'tacta-ai-set-muted', textContent: 'Set AWS_PROFILE or AWS_REGION before "npm start" to use a different profile or region. The helper only answers requests from this extension.' })
+        ]);
+        var helperRow = el('div', { className: 'tacta-ai-set-row' }, [
+            el('div', { className: 'tacta-ai-set-label' }, ['Helper address', el('small', { textContent: 'Local only (127.0.0.1 or localhost)' })]),
+            el('div', { className: 'tacta-ai-set-control' }, [helperUrlInput, helperCheckBtn, helperStatus])
+        ]);
+        var keyRow = el('div', { className: 'tacta-ai-set-row' }, [
+            el('div', { className: 'tacta-ai-set-label' }, ['API key', el('small', { textContent: 'Bedrock API key (long-term or short-term)' })]),
+            el('div', { className: 'tacta-ai-set-control' }, [keyInput, keyToggle])
+        ]);
+        function syncAuthVisibility() {
+            var helper = authHelper.checked;
+            helperGuide.classList.toggle('tacta-ai-set-hidden', !helper);
+            helperRow.classList.toggle('tacta-ai-set-hidden', !helper);
+            keyRow.classList.toggle('tacta-ai-set-hidden', helper);
+            refreshPermStatus();
+        }
+        authHelper.addEventListener('change', syncAuthVisibility);
+        authKey.addEventListener('change', syncAuthVisibility);
+        helperCheckBtn.addEventListener('click', function () {
+            var base = (helperUrlInput.value.trim() || HELPER_DEFAULT_URL).replace(/\/+$/, '');
+            setStatus(helperStatus, 'Checking...', null);
+            fetch(base + '/health', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+                setStatus(helperStatus, j && j.ok ? 'Helper running (profile ' + j.profile + ', ' + j.region + ')' : 'Unexpected reply', j && j.ok ? 'ok' : 'warn');
+            }).catch(function () {
+                setStatus(helperStatus, 'Not reachable. Start it with the command above (and Save first so Chrome allows 127.0.0.1).', 'warn');
+            });
+        });
+
         keyToggle.addEventListener('click', function () {
             var show = keyInput.type === 'password';
             keyInput.type = show ? 'text' : 'password';
@@ -296,9 +358,15 @@
                 el('div', { className: 'tacta-ai-set-control', style: { flexWrap: 'wrap' } }, [modelSelect, modelInput])
             ]),
             el('div', { className: 'tacta-ai-set-row' }, [
-                el('div', { className: 'tacta-ai-set-label' }, ['API key', el('small', { textContent: 'Bedrock API key (long-term or short-term)' })]),
-                el('div', { className: 'tacta-ai-set-control' }, [keyInput, keyToggle])
+                el('div', { className: 'tacta-ai-set-label' }, ['Sign in with', el('small', { textContent: 'How the extension gets a Bedrock token' })]),
+                el('div', { className: 'tacta-ai-set-control', style: { flexWrap: 'wrap' } }, [
+                    el('label', { className: 'tacta-ai-set-pick' }, [authHelper, el('span', { textContent: 'My AWS login (local helper, recommended)' })]),
+                    el('label', { className: 'tacta-ai-set-pick' }, [authKey, el('span', { textContent: 'A Bedrock API key' })])
+                ])
             ]),
+            helperGuide,
+            helperRow,
+            keyRow,
             el('div', { className: 'tacta-ai-set-row' }, [
                 el('div', { className: 'tacta-ai-set-label' }, ['Host permission']),
                 el('div', { className: 'tacta-ai-set-control' }, [permStatus])
@@ -420,12 +488,18 @@
             testBtn.disabled = state.provider === 'none';
         }
 
-        function refreshPermStatus() {
+        function neededOrigins() {
             var region = regionInput.value.trim() || 'us-east-1';
-            permissionsContains(region).then(function (ok) {
-                setStatus(permStatus, ok
-                    ? 'Granted for bedrock-runtime.' + region + '.amazonaws.com'
-                    : 'Not granted for bedrock-runtime.' + region + '.amazonaws.com (Save will ask)', ok ? 'ok' : 'warn');
+            var origins = [bedrockOriginPattern(region)];
+            if (authHelper.checked) origins.push(helperOriginPattern(helperUrlInput.value.trim() || HELPER_DEFAULT_URL));
+            return origins;
+        }
+
+        function refreshPermStatus() {
+            var origins = neededOrigins();
+            permissionsContains(origins).then(function (ok) {
+                var hosts = origins.map(function (o) { return o.replace(/^https?:\/\//, '').replace(/\/\*$/, ''); }).join(' and ');
+                setStatus(permStatus, ok ? 'Granted for ' + hosts : 'Not granted for ' + hosts + ' (Save will ask)', ok ? 'ok' : 'warn');
             });
         }
 
@@ -436,6 +510,10 @@
             var preset = MODEL_PRESETS.some(function (m) { return m.id === modelInput.value; });
             modelSelect.value = preset ? modelInput.value : '';
             keyInput.value = s.bedrock.apiKey || '';
+            authHelper.checked = s.bedrock.auth === 'helper';
+            authKey.checked = !authHelper.checked;
+            helperUrlInput.value = s.bedrock.helperUrl || HELPER_DEFAULT_URL;
+            syncAuthVisibility();
             scriptInput.value = s.netsuite.scriptId || '';
             deployInput.value = s.netsuite.deployId || '';
             maskInput.checked = s.maskSensitive !== false;
@@ -451,6 +529,8 @@
                 bedrock: {
                     region: regionInput.value.trim().toLowerCase() || 'us-east-1',
                     modelId: modelInput.value.trim() || 'us.anthropic.claude-fable-5-1',
+                    auth: authHelper.checked ? 'helper' : 'key',
+                    helperUrl: (helperUrlInput.value.trim() || HELPER_DEFAULT_URL).replace(/\/+$/, ''),
                     apiKey: keyInput.value.trim()
                 },
                 netsuite: {
@@ -477,9 +557,9 @@
             var settings = collectForm();
             saveBtn.disabled = true;
             var permPromise = Promise.resolve(null);
-            if (settings.provider === 'bedrock' && settings.bedrock.apiKey) {
+            if (settings.provider === 'bedrock' && (settings.bedrock.auth === 'helper' || settings.bedrock.apiKey)) {
                 // Must run inside the click gesture, before any await.
-                permPromise = permissionsRequest(settings.bedrock.region).then(function (granted) {
+                permPromise = permissionsRequest(neededOrigins()).then(function (granted) {
                     return granted ? 'granted' : 'denied';
                 }, function (err) { return 'error:' + err.message; });
             }
@@ -491,7 +571,7 @@
                     if (permResult === 'granted') msg += ' Bedrock host permission granted.';
                     else if (permResult === 'denied') { msg += ' Bedrock host permission was declined; chat will fail until you save again and allow it.'; kind = 'warn'; }
                     else if (permResult && permResult.indexOf('error:') === 0) { msg += ' Permission request failed: ' + permResult.slice(6) + ' (is optional_host_permissions set in the manifest?)'; kind = 'warn'; }
-                    if (settings.provider === 'bedrock' && !settings.bedrock.apiKey) { msg += ' No API key entered yet.'; kind = 'warn'; }
+                    if (settings.provider === 'bedrock' && settings.bedrock.auth === 'key' && !settings.bedrock.apiKey) { msg += ' No API key entered yet.'; kind = 'warn'; }
                     if (settings.provider === 'netsuite' && (!settings.netsuite.scriptId || !settings.netsuite.deployId)) { msg += ' Script id and deployment id are both required.'; kind = 'warn'; }
                     setStatus(resultLine, msg, kind);
                     refreshPermStatus();

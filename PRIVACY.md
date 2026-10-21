@@ -41,7 +41,7 @@ This information is processed entirely inside your browser and never transmitted
 The assistant is off until you configure it. It is grounded in the NetSuite account you are signed in to and can only read: it runs SuiteQL SELECT statements, looks up the Records Catalog, and reads the record on screen. It cannot create, update or delete anything.
 
 - **What is sent:** your message, the schema metadata and query results the assistant needs, and (if you tick "Include this record") the field values of the record on screen. Emails, phone numbers, tax ids and card numbers are masked before sending unless you turn masking off.
-- **Where it goes:** only to the provider you selected. With Claude on Amazon Bedrock, to `bedrock-runtime.<region>.amazonaws.com` using your API key. With NetSuite AI, to a RESTlet inside your own NetSuite account, so the data never leaves NetSuite.
+- **Where it goes:** only to the provider you selected. With Claude on Amazon Bedrock, to `bedrock-runtime.<region>.amazonaws.com` using either a Bedrock API key you pasted or a short-term token minted on your own computer by the optional local helper from your existing AWS login (the helper listens on 127.0.0.1 only and the extension asks for permission to reach it). With NetSuite AI, to a RESTlet inside your own NetSuite account, so the data never leaves NetSuite.
 - **When:** only when you press Send. Nothing runs in the background.
 - **Developer access:** none. The developer never sees prompts, results or keys.
 
@@ -56,7 +56,7 @@ The assistant is off until you configure it. It is grounded in the NetSuite acco
 
 ## Network access
 
-The extension's `manifest.json` requests host access for `https://*.netsuite.com/*` and `https://*.oracle.com/*`. NetSuite uses per-account subdomains (for example `1234567.app.netsuite.com`), so the wildcard is required for the extension to function. One optional host permission, `https://*.amazonaws.com/*`, is requested at runtime only if you choose Claude on Amazon Bedrock as the assistant provider; you can revoke it at any time from the extension's details page in Chrome.
+The extension's `manifest.json` requests host access for `https://*.netsuite.com/*` and `https://*.oracle.com/*`. NetSuite uses per-account subdomains (for example `1234567.app.netsuite.com`), so the wildcard is required for the extension to function. Two optional host permissions are requested at runtime and only if you use them: `https://*.amazonaws.com/*` when you choose Claude on Amazon Bedrock, and `http://127.0.0.1/*` / `http://localhost/*` when you choose to sign in with your AWS login through the local token helper. You can revoke either at any time from the extension's details page in Chrome.
 
 ## Permissions
 

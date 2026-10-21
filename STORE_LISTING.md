@@ -106,6 +106,10 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 > Requested at runtime, only if the user chooses "Claude on Amazon Bedrock" as the AI assistant provider and saves an API key. It allows the extension to call the Amazon Bedrock runtime endpoint (`bedrock-runtime.<region>.amazonaws.com`) with the user's own key to answer questions about the NetSuite account they are signed in to. Users who pick NetSuite's own AI, or who do not use the assistant, are never asked for it. No other AWS service is contacted.
 
+### Optional host permission: `http://127.0.0.1/*` and `http://localhost/*`
+
+> Requested at runtime only if the user chooses "My AWS login" for the Claude on Amazon Bedrock provider. The extension then fetches short-term Bedrock tokens from a small helper program the user runs on their own computer (source in `tools/bedrock-token-helper`), which mints the tokens from the user's existing AWS CLI or Identity Center session. This avoids storing any long-lived credential in the browser. No other local service is contacted and nothing is served to web pages.
+
 ### Host permission: `https://*.netsuite.com/*`
 
 > NetSuite assigns each customer account a unique subdomain - for example `1234567.app.netsuite.com`, `1234567-sb1.app.netsuite.com`, `system.netsuite.com`. Because the user's account ID is variable and unknown at install time, the extension must use a wildcard host permission to function across the user's production account, sandbox accounts, and the shared system subdomain. The extension does not declare host access for any other origin.

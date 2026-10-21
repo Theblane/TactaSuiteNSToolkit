@@ -16,7 +16,7 @@ On first install a setup walkthrough opens. It asks whether you are a Traditiona
 ## Features
 
 ### AI
-- **AI Assistant** (optional, off until configured) - ask questions about the NetSuite account you are signed in to. The assistant is grounded with read-only tools: SuiteQL SELECT queries, the Records Catalog and the record on screen. It cannot write. Choose **Claude on Amazon Bedrock** (your own API key, optional host permission requested on save) or **NetSuite's own AI** through an N/llm RESTlet you deploy; the settings page shows the RESTlet code and a step-by-step install guide. Sensitive values (emails, phones, tax ids, card numbers) are masked before anything leaves the browser.
+- **AI Assistant** (optional, off until configured) - ask questions about the NetSuite account you are signed in to. The assistant is grounded with read-only tools: SuiteQL SELECT queries, the Records Catalog and the record on screen. It cannot write. Choose **Claude on Amazon Bedrock** (sign in with the AWS login already on your machine through the small local helper in `tools/bedrock-token-helper`, or paste a Bedrock API key; optional host permissions requested on save) or **NetSuite's own AI** through an N/llm RESTlet you deploy; the settings page shows the RESTlet code and a step-by-step install guide. Sensitive values (emails, phones, tax ids, card numbers) are masked before anything leaves the browser.
 
 ### Developer
 - **Field Explorer** - inspect every field on the current record: IDs, types, values, sublist columns.
@@ -104,7 +104,8 @@ The extension requests only what it needs to operate inside NetSuite:
 | `declarativeContent` | Show the extension action icon only on `*.netsuite.com` pages. |
 | `contextMenus` | Right-click menu entries (e.g., Split View). |
 | Host: `https://*.netsuite.com/*`, `https://*.oracle.com/*` | NetSuite uses per-account subdomains (`<accountid>.app.netsuite.com`), so wildcard host access is required. |
-| Optional host: `https://*.amazonaws.com/*` | Requested at runtime only if you choose Claude on Amazon Bedrock for the AI Assistant and save an API key. Revocable from the extension details page. |
+| Optional host: `https://*.amazonaws.com/*` | Requested at runtime only if you choose Claude on Amazon Bedrock for the AI Assistant. Revocable from the extension details page. |
+| Optional host: `http://127.0.0.1/*`, `http://localhost/*` | Requested only if you pick "My AWS login" for Bedrock: the extension fetches short-term Bedrock tokens from the local helper in `tools/bedrock-token-helper`, which mints them from your AWS CLI / Identity Center session. Nothing else on localhost is contacted. |
 
 ## Privacy
 

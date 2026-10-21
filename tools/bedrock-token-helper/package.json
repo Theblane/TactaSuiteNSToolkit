@@ -1,0 +1,16 @@
+{
+  "name": "tactasuite-bedrock-token-helper",
+  "version": "1.0.0",
+  "description": "Mints short-term Amazon Bedrock tokens from your AWS login for the NetSuite TactaSuite assistant.",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "@aws/bedrock-token-generator": "^1.1.0"
+  },
+  "private": true,
+  "author": "Blane Maher",
+  "license": "MIT"
+}

@@ -40,6 +40,11 @@ export const AI_DEFAULT_SETTINGS = {
   bedrock: {
     region: 'us-east-1',
     modelId: 'us.anthropic.claude-fable-5-1',
+    // 'key'    - a Bedrock API key pasted into the settings (bearer token)
+    // 'helper' - short-term tokens minted by tools/bedrock-token-helper from the
+    //            AWS login already on this machine (Identity Center / SSO)
+    auth: 'key',
+    helperUrl: 'http://127.0.0.1:38790',
     apiKey: ''
   },
   netsuite: {
@@ -93,6 +98,10 @@ function normalizeSettings(raw) {
   let modelId = String(bed.modelId || AI_DEFAULT_SETTINGS.bedrock.modelId).trim();
   if (!/^[A-Za-z0-9._:/-]+$/.test(modelId)) modelId = AI_DEFAULT_SETTINGS.bedrock.modelId;
 
+  const auth = bed.auth === 'helper' ? 'helper' : 'key';
+  let helperUrl = String(bed.helperUrl || AI_DEFAULT_SETTINGS.bedrock.helperUrl).trim().replace(/\/+$/, '');
+  if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d{2,5})?$/.test(helperUrl)) helperUrl = AI_DEFAULT_SETTINGS.bedrock.helperUrl;
+
   let maxSteps = parseInt(src.maxSteps, 10);
   if (!maxSteps || maxSteps < 1) maxSteps = AI_DEFAULT_SETTINGS.maxSteps;
   if (maxSteps > MAX_STEPS_HARD_CAP) maxSteps = MAX_STEPS_HARD_CAP;
@@ -102,6 +111,8 @@ function normalizeSettings(raw) {
     bedrock: {
       region,
       modelId,
+      auth,
+      helperUrl,
       apiKey: typeof bed.apiKey === 'string' ? bed.apiKey.trim() : ''
     },
     netsuite: {
@@ -575,6 +586,49 @@ export function bedrockOrigin(region) {
   return 'https://bedrock-runtime.' + region + '.amazonaws.com';
 }
 
+/** Origin match pattern for the local token helper, e.g. http://127.0.0.1:38790/* */
+export function helperOriginPattern(helperUrl) {
+  try { return new URL(helperUrl).origin + '/*'; } catch (_) { return 'http://127.0.0.1/*'; }
+}
+
+// Short-term token from the local helper, cached until shortly before expiry.
+const helperToken = { url: '', token: '', expiresAt: 0 };
+
+/**
+ * Resolves the bearer token for a Bedrock call: the pasted API key, or a
+ * short-term token minted by the local helper from the user's AWS login.
+ * @param {Object} bedrock - settings.bedrock
+ * @returns {Promise<string>}
+ */
+async function resolveBearer(bedrock) {
+  if (bedrock.auth !== 'helper') {
+    if (!bedrock.apiKey) throw new Error('No Bedrock API key saved. Open AI settings and add one, or switch to "Use my AWS login".');
+    return bedrock.apiKey;
+  }
+  const now = Date.now();
+  if (helperToken.token && helperToken.url === bedrock.helperUrl && helperToken.expiresAt - 60000 > now) {
+    return helperToken.token;
+  }
+  let ok = false;
+  try { ok = await chrome.permissions.contains({ origins: [helperOriginPattern(bedrock.helperUrl)] }); } catch (_) { ok = false; }
+  if (!ok) throw new Error('The extension does not have permission to reach the local helper at ' + bedrock.helperUrl + '. Re-save the Bedrock settings to grant it.');
+  let res;
+  try {
+    res = await fetch(bedrock.helperUrl + '/token', { headers: { 'X-Tacta-Helper': '1' }, cache: 'no-store' });
+  } catch (e) {
+    throw new Error('The local AWS token helper is not running at ' + bedrock.helperUrl + '. Start it with "npm start" in tools/bedrock-token-helper (see AI settings for the steps).');
+  }
+  let json = null;
+  try { json = await res.json(); } catch (_) { json = null; }
+  if (!res.ok || !json || !json.token) {
+    throw new Error('The token helper could not mint a token: ' + ((json && json.error) || ('HTTP ' + res.status)));
+  }
+  helperToken.url = bedrock.helperUrl;
+  helperToken.token = String(json.token);
+  helperToken.expiresAt = Number(json.expiresAt) || (now + 60 * 60 * 1000);
+  return helperToken.token;
+}
+
 /**
  * Checks the optional host permission for the Bedrock endpoint.
  * @param {string} region
@@ -595,7 +649,7 @@ async function hasBedrockPermission(region) {
  * @returns {Promise<Object>} Converse response JSON.
  */
 async function bedrockConverse(bedrock, body) {
-  if (!bedrock.apiKey) throw new Error('No Bedrock API key saved. Open AI settings and add one.');
+  const bearer = await resolveBearer(bedrock);
   if (!(await hasBedrockPermission(bedrock.region))) {
     throw new Error('The extension does not have permission to reach ' + bedrockOrigin(bedrock.region) + '. Re-save the Bedrock settings to grant it.');
   }
@@ -605,7 +659,7 @@ async function bedrockConverse(bedrock, body) {
     res = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + bedrock.apiKey,
+        'Authorization': 'Bearer ' + bearer,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
@@ -621,7 +675,7 @@ async function bedrockConverse(bedrock, body) {
     const detail = (json && (json.message || json.Message)) || text.slice(0, 300) || res.statusText;
     const prefix = {
       400: 'Bedrock rejected the request (validation)',
-      401: 'Bedrock rejected the API key',
+      401: 'Bedrock rejected the token (expired AWS session? run aws sso login)',
       403: 'Bedrock denied access (key, model access or region)',
       404: 'Model not found in ' + bedrock.region,
       424: 'Bedrock model dependency failed',

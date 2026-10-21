@@ -31,7 +31,9 @@
     "https://*.oracle.com/*"
   ],
   "optional_host_permissions": [
-    "https://*.amazonaws.com/*"
+    "https://*.amazonaws.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "content_scripts": [
     {
