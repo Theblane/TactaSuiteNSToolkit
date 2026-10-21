@@ -23,8 +23,8 @@
     var RESTLET_FILE_NAME = 'tacta_rl_netsuite_llm.js';
 
     var MODEL_PRESETS = [
-        { id: 'us.anthropic.claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (default)' },
-        { id: 'us.anthropic.claude-fable-5-1', label: 'Claude Fable 5.1' },
+        { id: 'us.anthropic.claude-fable-5-1', label: 'Claude Fable 5.1 (default)' },
+        { id: 'us.anthropic.claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
         { id: 'us.anthropic.claude-opus-5', label: 'Claude Opus 5' },
         { id: 'us.anthropic.claude-sonnet-5', label: 'Claude Sonnet 5' },
         { id: 'us.anthropic.claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' }
@@ -230,7 +230,7 @@
         var root = el('div', { className: 'tacta-ai-set' + (opts.compact ? ' tacta-ai-set-compact' : '') });
         containerEl.appendChild(root);
 
-        var state = { provider: 'none', bedrock: { region: 'us-east-1', modelId: 'us.anthropic.claude-sonnet-4-5', apiKey: '' }, netsuite: { scriptId: '', deployId: '' }, maskSensitive: true, maxSteps: 8 };
+        var state = { provider: 'none', bedrock: { region: 'us-east-1', modelId: 'us.anthropic.claude-fable-5-1', apiKey: '' }, netsuite: { scriptId: '', deployId: '' }, maskSensitive: true, maxSteps: 8 };
 
         // ── Provider card ──
         var providerCard = el('div', { className: 'tacta-ai-set-card' }, [
@@ -264,7 +264,7 @@
         var regionInput = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: 'us-east-1', list: 'tacta-ai-set-regions', spellcheck: 'false' });
         var regionList = el('datalist', { id: 'tacta-ai-set-regions' }, REGION_PRESETS.map(function (r) { return el('option', { value: r }); }));
         var modelSelect = el('select', { className: 'tacta-ai-set-select' }, MODEL_PRESETS.map(function (m) { return el('option', { value: m.id, textContent: m.label }); }).concat([el('option', { value: '', textContent: 'Custom model id...' })]));
-        var modelInput = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: 'us.anthropic.claude-sonnet-4-5', spellcheck: 'false' });
+        var modelInput = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: 'us.anthropic.claude-fable-5-1', spellcheck: 'false' });
         var keyInput = el('input', { className: 'tacta-ai-set-input', type: 'password', placeholder: 'Bedrock API key (bearer token)', autocomplete: 'off', spellcheck: 'false' });
         var keyToggle = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Show' });
         var permStatus = el('span', { className: 'tacta-ai-set-status' });
@@ -450,7 +450,7 @@
                 provider: state.provider,
                 bedrock: {
                     region: regionInput.value.trim().toLowerCase() || 'us-east-1',
-                    modelId: modelInput.value.trim() || 'us.anthropic.claude-sonnet-4-5',
+                    modelId: modelInput.value.trim() || 'us.anthropic.claude-fable-5-1',
                     apiKey: keyInput.value.trim()
                 },
                 netsuite: {

@@ -541,7 +541,7 @@ export const FEATURES = [
     group: 'misc',
     description: 'Auto-refresh every dashboard portlet on a 1 to 15 minute schedule while the tab is visible.',
     defaultEnabled: false,
-    audience: ['user', 'admin', 'developer'],
+    audience: [],
     onboarding: {
       summary: 'Keep dashboard KPIs current without reloading.',
       where: 'Auto-refresh control in the dashboard heading panel.'
@@ -557,7 +557,7 @@ export const FEATURES = [
     label: 'Instant UI',
     group: 'layout',
     description: 'Remove NetSuite animations and transitions so the interface responds immediately.',
-    defaultEnabled: false,
+    defaultEnabled: true,
     audience: ['user', 'admin', 'developer'],
     onboarding: {
       summary: 'Snappier NetSuite with no fade-ins.',

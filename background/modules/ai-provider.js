@@ -39,7 +39,7 @@ export const AI_DEFAULT_SETTINGS = {
   provider: 'none',
   bedrock: {
     region: 'us-east-1',
-    modelId: 'us.anthropic.claude-sonnet-4-5',
+    modelId: 'us.anthropic.claude-fable-5-1',
     apiKey: ''
   },
   netsuite: {

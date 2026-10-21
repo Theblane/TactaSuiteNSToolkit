@@ -857,3 +857,36 @@ body.meeting-mode .tacta-active-features {
     padding: 3px;
     border-radius: var(--tacta-radius-sm);
 }
+
+/* ── Update notice ─────────────────────────────────────────────── */
+
+.tacta-update-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-size: 11.5px;
+    color: var(--tacta-text);
+    background: var(--tacta-accent-muted);
+    border-bottom: 1px solid var(--tacta-border);
+}
+
+.tacta-update-notice[hidden] {
+    display: none;
+}
+
+.tacta-update-text {
+    flex: 1;
+}
+
+.tacta-update-dismiss {
+    padding: 2px 6px;
+    color: var(--tacta-text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.tacta-update-dismiss:hover {
+    color: var(--tacta-text);
+}

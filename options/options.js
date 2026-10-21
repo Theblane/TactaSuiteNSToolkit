@@ -279,8 +279,20 @@
 
     /* ── Export Settings ──────────────────────────────────────────── */
 
+    /**
+     * Storage keys that never travel in an export: the AI settings hold an API
+     * key, and onboarding progress is per install.
+     */
+    const EXPORT_EXCLUDE = /^(tacta_ai_settings|tacta_onboarding_|tacta_update_notice)/;
+
     async function exportSettings() {
-        const themeData = await chrome.storage.local.get('tacta_theme_settings');
+        const all = await chrome.storage.local.get(null);
+        const preferences = {};
+        for (const [key, value] of Object.entries(all)) {
+            if (key.indexOf('tacta_') === 0 && !EXPORT_EXCLUDE.test(key) && key !== 'tacta_theme_settings') {
+                preferences[key] = value;
+            }
+        }
         const payload = {
             _meta: {
                 extension:  'NetSuite TactaSuite',
@@ -288,7 +300,11 @@
                 exportedAt: new Date().toISOString(),
             },
             featureStates,
-            themeSettings: themeData.tacta_theme_settings || null,
+            themeSettings: all.tacta_theme_settings || null,
+            meetingMode: all.meetingMode === true,
+            // Saved SuiteQL queries and history, user type, quick search types,
+            // account colors, environment badge and portlet preferences, etc.
+            preferences,
         };
 
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -346,10 +362,25 @@
                         window.TactaThemeManager.apply(data.themeSettings);
                     }
                 }
-                chrome.storage.local.set(updates);
-                renderFeatureList();
-                loadThemeSettings();
-                showToast(`Imported ${importCount} feature settings`, 'success');
+                if (typeof data.meetingMode === 'boolean') updates.meetingMode = data.meetingMode;
+                let prefCount = 0;
+                if (data.preferences && typeof data.preferences === 'object') {
+                    for (const [key, value] of Object.entries(data.preferences)) {
+                        if (key.indexOf('tacta_') === 0 && !EXPORT_EXCLUDE.test(key)) {
+                            updates[key] = value;
+                            prefCount++;
+                        }
+                    }
+                }
+                chrome.storage.local.set(updates).then(() => {
+                    renderFeatureList();
+                    loadThemeSettings();
+                    loadAccountColorSettings();
+                    loadGeneralSettings();
+                    loadQscSettings();
+                    loadUserType();
+                });
+                showToast(`Imported ${importCount} feature settings and ${prefCount} preferences`, 'success');
 
             } catch {
                 showToast('Failed to parse settings file', 'error');

@@ -30,6 +30,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await initDefaults(FEATURES);
   }
 
+  // Updated: let the popup offer the walkthrough once so new features land.
+  if (details.reason === 'update') {
+    const current = chrome.runtime.getManifest().version;
+    if (details.previousVersion && details.previousVersion !== current) {
+      await chrome.storage.local.set({ tacta_update_notice: { from: details.previousVersion, to: current } });
+    }
+  }
+
   // First install: open the setup walkthrough. It asks who the user is,
   // seeds the feature toggles for that user type and explains each feature.
   if (details.reason === 'install') {

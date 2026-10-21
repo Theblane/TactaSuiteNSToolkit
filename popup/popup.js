@@ -134,6 +134,35 @@
         updateMeetingModeUI();
         await loadSettingsPanel();
         renderAuthor();
+        await loadUpdateNotice();
+    }
+
+    /* ── Update notice ─────────────────────────────────────────────── */
+
+    async function loadUpdateNotice() {
+        const $notice = document.getElementById('updateNotice');
+        if (!$notice) return;
+        let notice = null;
+        try {
+            const data = await chrome.storage.local.get('tacta_update_notice');
+            notice = data.tacta_update_notice || null;
+        } catch (_) { /* ignore */ }
+        if (!notice || !notice.to) return;
+        const $text = document.getElementById('updateNoticeText');
+        if ($text) $text.textContent = 'Updated to v' + notice.to + '. New features are off until you turn them on.';
+        $notice.removeAttribute('hidden');
+        const dismiss = () => { chrome.storage.local.remove('tacta_update_notice'); $notice.setAttribute('hidden', ''); };
+        const $tour = document.getElementById('updateNoticeTour');
+        const $dismiss = document.getElementById('updateNoticeDismiss');
+        if ($tour) {
+            $tour.addEventListener('click', () => {
+                dismiss();
+                sendMessage({ action: 'openOnboarding', step: 'features' }).then(() => window.close()).catch(() => {
+                    chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/onboarding.html?step=features') });
+                });
+            });
+        }
+        if ($dismiss) $dismiss.addEventListener('click', dismiss);
     }
 
     /** Author name and support links in the footer (shared/author-links.js). */
