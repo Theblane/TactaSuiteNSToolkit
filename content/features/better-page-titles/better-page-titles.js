@@ -69,11 +69,36 @@
         for (var i = 0; i < selectors.length; i++) {
             var el = document.querySelector(selectors[i]);
             if (el) {
-                var text = (el.textContent || '').trim();
+                var text = _headerText(el);
                 if (text) return text;
             }
         }
         return null;
+    }
+
+    /**
+     * Text of a header element with NetSuite's inline menus and toolbars
+     * removed. The record title line carries the "List / Search / Customize"
+     * menu and the "New Body Field" shortcuts as children, and their text
+     * must never end up in a tab title.
+     * @param {Element} el
+     * @returns {string}
+     */
+    function _headerText(el) {
+        if (!el) return '';
+        var clone = el.cloneNode(true);
+        var junk = clone.querySelectorAll(
+            'ul, ol, table, button, select, input, textarea, script, style, ' +
+            '.uir-menu, .ns-menu, .uir-page-title-menu, .uir-toolbar, .uir-list-ta, ' +
+            '[class*="menu"], [class*="Menu"], [role="menu"], [role="menubar"], .uir-help-link, .tacta-env-badge'
+        );
+        for (var i = 0; i < junk.length; i++) {
+            if (junk[i].parentNode) junk[i].parentNode.removeChild(junk[i]);
+        }
+        var text = (clone.textContent || '').replace(/\s+/g, ' ').trim();
+        // Anything beyond a sane header length is menu residue, not a name.
+        if (text.length > 120) text = text.slice(0, 120).trim();
+        return text;
     }
 
     /**
@@ -82,13 +107,19 @@
      * @returns {string|null}
      */
     function _getRecordType() {
-        // The second-line page title often holds "Sales Order", "Customer", etc.
-        var type = _textFromSelectors([
-            '.uir-page-title-secondline',
-            '#_recordTypeName',
-            '.uir-record-type'
-        ]);
+        // NetSuite marks the type explicitly when it can; otherwise the first
+        // title line holds "Sales Order", "Customer", etc. (the second line is
+        // the record name and status). Older layouts had the two lines swapped,
+        // so a short first line wins over the second.
+        var type = _textFromSelectors(['.uir-record-type', '#_recordTypeName']);
         if (type) return type;
+        var first = _textFromSelectors(['.uir-page-title-firstline']);
+        var second = _textFromSelectors(['.uir-page-title-secondline']);
+        if (first && second) {
+            return first.length <= second.length ? first : second;
+        }
+        if (first) return first;
+        if (second) return second;
 
         // Breadcrumb: the last breadcrumb text before the record name
         var breadcrumbs = document.querySelectorAll('.ns-breadcrumb-text, .uir-breadcrumb span');
@@ -105,11 +136,13 @@
      * @returns {string|null}
      */
     function _getRecordName() {
-        return _textFromSelectors([
-            '.uir-page-title-firstline',
-            '#headertext',
-            '.uir-page-title'
-        ]);
+        var first = _textFromSelectors(['.uir-page-title-firstline']);
+        var second = _textFromSelectors(['.uir-page-title-secondline']);
+        // Whichever title line is NOT the type is the name (see _getRecordType).
+        if (first && second) {
+            return first.length <= second.length ? second : first;
+        }
+        return first || second || _textFromSelectors(['#headertext', '.uir-page-title']);
     }
 
     /**

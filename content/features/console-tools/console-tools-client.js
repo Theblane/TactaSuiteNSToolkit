@@ -133,7 +133,20 @@
     });
   }
 
+  /**
+   * Open a toolkit feature from the console, e.g.
+   * TactaNSKit.open('screenshot-studio'). The request is relayed to the
+   * extension by the console-tools content script.
+   * @param {string} featureId
+   */
+  function open(featureId) {
+    if (!featureId) { console.warn('[TactaNSKit] open(featureId) needs a feature id, e.g. "field-explorer".'); return; }
+    window.postMessage({ source: 'tacta-nskit', type: 'openFeature', featureId: String(featureId) }, window.location.origin);
+    return 'Opening ' + featureId + '...';
+  }
+
   window.TactaNSKit = {
+    open: open,
     getCurrentRecord: getCurrentRecord,
     updateField: updateField,
     setField: updateField,
@@ -148,7 +161,8 @@
       externalId: "await TactaNSKit.updateExternalId('ABC-123')",
       overwriteSalesTax: "await TactaNSKit.updateOverwriteSalesTax(true)",
       anyField: "await TactaNSKit.updateField('memo', 'Updated from console')",
-      inspect: "console.table(await TactaNSKit.listFields())"
+      inspect: "console.table(await TactaNSKit.listFields())",
+      open: "TactaNSKit.open('field-explorer')  // any toolkit feature id"
     }
   };
 
