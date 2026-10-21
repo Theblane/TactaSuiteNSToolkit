@@ -216,30 +216,6 @@
      * or null when no header is present (caller uses the fixed fallback).
      * @returns {{ parent: HTMLElement, before: Node|null }|null}
      */
-    function findAnchor() {
-        // 1. Right after the NetSuite logo
-        var logoSelectors = [
-            '#ns-header-logo', '.ns-header-logo', '.ns-logo', '#ns-logo',
-            '#ns_navigation .ns-logo', 'a[href*="/app/center/card.nl"] img'
-        ];
-        for (var i = 0; i < logoSelectors.length; i++) {
-            var logo = document.querySelector(logoSelectors[i]);
-            if (logo && logo.parentNode) {
-                // If the logo is an <img> wrapped in <a>, insert after the <a>
-                var node = (logo.tagName === 'IMG' && logo.parentNode.tagName === 'A') ? logo.parentNode : logo;
-                if (node.parentNode) return { parent: node.parentNode, before: node.nextSibling };
-            }
-        }
-
-        // 2. Start of the header bar / navigation
-        var headerSelectors = ['.uir-header', '#ns_navigation', '#ns-header', '.ns-header', '#div__header'];
-        for (var j = 0; j < headerSelectors.length; j++) {
-            var hdr = document.querySelector(headerSelectors[j]);
-            if (hdr) return { parent: hdr, before: hdr.firstChild };
-        }
-        return null;
-    }
-
     /**
      * Copy text to the clipboard using TactaDOM when available.
      * @param {string} text
@@ -299,19 +275,16 @@
     }
 
     /**
-     * Insert the pill into the header, or fall back to a fixed top-left pill.
+     * Mount the pill as a fixed top-left overlay (never inside the NetSuite header flow).
      */
     function mountPill() {
         if (document.getElementById(PILL_ID)) return;
+        // Always a fixed overlay. Inserting into #div__header pushed NetSuite's
+        // own header content down by the pill height: NetSuite sizes the header
+        // once at load, so the blue menu bar ended up clipped over the record.
         var pill = buildPill();
-        var anchor = findAnchor();
-        if (anchor && anchor.parent) {
-            anchor.parent.insertBefore(pill, anchor.before || null);
-            pill.classList.add(SC + '--inline');
-        } else {
-            pill.classList.add(SC + '--fixed');
-            (document.body || document.documentElement).appendChild(pill);
-        }
+        pill.classList.add(SC + '--fixed');
+        (document.body || document.documentElement).appendChild(pill);
     }
 
     /**
