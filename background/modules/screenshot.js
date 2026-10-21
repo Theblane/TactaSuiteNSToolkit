@@ -237,6 +237,16 @@ async function composeTiles(tiles, metrics, totalCss) {
 async function getWindowId(tabId) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab || typeof tab.windowId !== 'number') throw new Error('Could not resolve the tab window.');
+  // captureVisibleTab grabs whichever tab is showing in the window. If the
+  // studio was launched for a background tab (console hook, automation),
+  // bring that tab forward first so the capture is of the right page.
+  if (!tab.active) {
+    try {
+      await chrome.tabs.update(tabId, { active: true });
+      await chrome.windows.update(tab.windowId, { focused: true });
+      await sleep(250);
+    } catch (_) { /* best effort */ }
+  }
   return tab.windowId;
 }
 
