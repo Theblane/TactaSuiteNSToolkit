@@ -276,12 +276,13 @@
             apiData.bodyFields.push({
                 id: key,
                 label: _getDomFieldLabel(key),
-                type: 'unknown',
+                type: 'Unknown',
                 value: xmlData.bodyFields[key],
                 text: null,
                 isMandatory: false,
                 isDisabled: false,
-                isHidden: true // XML-only fields are likely hidden
+                isHidden: true, // present in the record XML but nowhere on the page
+                hiddenBy: 'xml'
             });
         }
 
@@ -304,7 +305,7 @@
                 fields.push({
                     id: fieldKeys[fi],
                     label: '',
-                    type: 'unknown',
+                    type: 'Unknown',
                     value: firstLine[fieldKeys[fi]],
                     text: null,
                     isMandatory: false,
@@ -725,7 +726,7 @@
 
         var typeBadge = TactaDOM.createElement('span', {
             className: 'tacta-fe-card-type',
-            textContent: field.type || 'unknown'
+            textContent: field.type || 'Unknown'
         });
 
         var headerRow = TactaDOM.createElement('div', {
@@ -857,7 +858,7 @@
             { key: 'Type', value: field.type },
             { key: 'Raw Value', value: field.value },
             { key: 'Display Text', value: field.text },
-            { key: 'Hidden', value: field.isHidden ? 'Yes' : 'No' },
+            { key: 'Hidden', value: _describeHidden(field) },
             { key: 'Source', value: field._source === 'sublist' ? 'Sublist (' + field._sublistId + ')' : 'Body Field' }
         ];
 
@@ -1160,6 +1161,22 @@
     }
 
     /**
+     * Human-readable hidden state including how it was determined.
+     * @param {Object} field
+     * @returns {string}
+     */
+    function _describeHidden(field) {
+        if (!field.isHidden) return 'No';
+        switch (field.hiddenBy) {
+            case 'dom': return 'Yes (collapsed on the page)';
+            case 'ss2': return 'Yes (N/currentRecord reports not displayed)';
+            case 'not-on-form': return 'Yes (on the record, not on this form)';
+            case 'xml': return 'Yes (only in record XML)';
+            default: return 'Yes';
+        }
+    }
+
+    /**
      * Creates a detail row with a clickable toggle link.
      */
     function _createToggleRow(label, currentValue, onClick) {
@@ -1276,9 +1293,13 @@
 
         var pageType = '';
         try {
-            pageType = (window.__tactaPageInfo && window.__tactaPageInfo.recordType)
-                ? window.__tactaPageInfo.recordType
-                : 'record';
+            if (_fieldData.meta && _fieldData.meta.recordType) {
+                pageType = _fieldData.meta.recordType;
+            } else if (window.__tactaPageInfo && window.__tactaPageInfo.recordType) {
+                pageType = window.__tactaPageInfo.recordType;
+            } else {
+                pageType = 'record';
+            }
         } catch (_) {
             pageType = 'record';
         }

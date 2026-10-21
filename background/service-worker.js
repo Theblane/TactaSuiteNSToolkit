@@ -434,464 +434,743 @@ async function getPageInfo(tabId) {
 
 // ---------------------------------------------------------------------------
 // Field Explorer page-world functions
+//
+// Each function below is serialised with Function.toString() and executed
+// inside the NetSuite page (world: 'MAIN'), so it must be fully
+// self-contained: no references to anything else in this file.
+//
+// Field metadata is resolved in priority order:
+//   1. SuiteScript 2.x N/currentRecord. NetSuite's require() is asynchronous,
+//      so the record is loaded through a Promise and the function returns a
+//      Promise (chrome.scripting.executeScript awaits it).
+//   2. NetSuite's own form markup: .uir-field-wrapper[data-field-type] with a
+//      <fieldId>_fs_lbl label. Present in both view and edit mode.
+//   3. SuiteScript 1.0 globals (nlapiGetField etc.) as a last resort. SS1
+//      reports 'text' for anything it cannot classify, so its type is only
+//      trusted when it also knows the field's label or the field is rendered.
 // ---------------------------------------------------------------------------
 
 function feGetRecordFieldsFn() {
+  const SS2_LOAD_TIMEOUT_MS = 2500;
+
   function ser(v) {
     if (v === null || v === undefined) return null;
     if (v instanceof Date) return v.toISOString();
-    if (typeof v === 'object') { try { return JSON.parse(JSON.stringify(v)); } catch(_) { return String(v); } }
+    if (Array.isArray(v)) return v.map(ser);
+    if (typeof v === 'object') { try { return JSON.parse(JSON.stringify(v)); } catch (_) { return String(v); } }
     return v;
   }
   function normType(t) {
     if (!t) return 'Unknown';
-    const m = {text:'Free-Form Text',textarea:'Text Area',richtext:'Rich Text',email:'Email',url:'URL',
-      phone:'Phone',integer:'Integer',float:'Decimal',currency:'Currency',percent:'Percent',
-      date:'Date',datetime:'Date/Time',checkbox:'Check Box',select:'List/Record',
-      multiselect:'Multi-Select',radio:'Radio',inlinehtml:'Inline HTML',longtext:'Long Text'};
-    return m[String(t).toLowerCase()] || t;
+    const m = {
+      text: 'Free-Form Text', textarea: 'Text Area', richtext: 'Rich Text', longtext: 'Long Text', clobtext: 'Long Text',
+      email: 'Email', url: 'URL', phone: 'Phone', identifier: 'Identifier', identifieranycase: 'Identifier', password: 'Password',
+      integer: 'Integer', posinteger: 'Integer', float: 'Decimal', posfloat: 'Decimal', nonnegfloat: 'Decimal',
+      currency: 'Currency', poscurrency: 'Currency', nonnegcurrency: 'Currency', currency2: 'Currency',
+      percent: 'Percent', rate: 'Rate', ratehighprecision: 'Rate', quantity: 'Quantity', posquantity: 'Quantity',
+      date: 'Date', datetime: 'Date/Time', datetimetz: 'Date/Time', timeofday: 'Time of Day', duration: 'Duration',
+      checkbox: 'Check Box', select: 'List/Record', multiselect: 'Multi-Select', radio: 'Radio',
+      inlinehtml: 'Inline HTML', image: 'Image', file: 'Document', document: 'Document', label: 'Label', help: 'Help',
+      summary: 'Summary', ccnumber: 'Credit Card Number', ccexpdate: 'Credit Card Expiration',
+      ccvalidfrom: 'Credit Card Valid From', cctype: 'Credit Card Type', hidden: 'Hidden', unknown: 'Unknown'
+    };
+    return m[String(t).toLowerCase()] || String(t);
   }
   function cleanLabel(text) {
     return String(text || '').replace(/\s+/g, ' ').replace(/[*:]\s*$/g, '').trim();
   }
-  function fieldDomIds(fid) {
-    const ids = [fid, fid + '_display', fid + '_val', fid + '_fs_lbl', fid + '_lbl', fid + '_label', fid + '_fs', 'inpt_' + fid];
-    if (fid && fid.charAt(fid.length - 1) === '_') {
-      const trimmed = fid.slice(0, -1);
-      ids.push(trimmed + '_display', trimmed + '_val', trimmed + '_fs_lbl', trimmed + '_lbl', trimmed + '_label', trimmed + '_fs');
-    }
-    return ids;
+  function cssEscape(s) {
+    return String(s).replace(/["\\]/g, '\\$&');
   }
   function normalizeBodyFieldId(id) {
     if (!id) return '';
     let fid = String(id);
     if (fid.indexOf('inpt_') === 0) fid = fid.substring(5);
-    [
-      '_display',
-      '_fs_lbl',
-      '_label',
-      '_lbl',
-      '_help',
-      '_err',
-      '_popup_link',
-      '_popup',
-      '_arrow',
-      '_val',
-      '_fs',
-      '_hdn'
-    ].some((suffix) => {
-      if (fid.slice(-suffix.length) === suffix) {
+    if (fid.indexOf('hddn_') === 0) fid = fid.substring(5);
+    ['_fs_lbl_uir_label', '_lbl_uir_label', '_display', '_fs_lbl', '_label', '_lbl', '_help', '_err',
+      '_popup_link', '_popup', '_arrow', '_val', '_fs', '_hdn', '_formattedValue'].some((suffix) => {
+      if (fid.length > suffix.length && fid.slice(-suffix.length) === suffix) {
         fid = fid.slice(0, -suffix.length);
         return true;
       }
       return false;
     });
-    if (!fid || /^(sys_|__|submitter|wfSR|nsapiPI|nsapiFC|nsapiLC|nsapiPS|nsapiVF|nsapiRC|hddn|uir-)/.test(fid)) return '';
+    if (!fid || /^(sys_|__|submitter|wfSR|nsapiPI|nsapiFC|nsapiLC|nsapiPS|nsapiVF|nsapiRC|nlapiPI|nlapiFC|nlapiLC|nlapiPS|nlapiVF|nlapiRC|hddn|uir-|tacta)/.test(fid)) return '';
     if (/row\d+$/.test(fid)) return '';
     return fid;
   }
-  function getDomFieldLabel(fid) {
-    const ids = fieldDomIds(fid);
-    for (let i = 0; i < ids.length; i++) {
-      const labelEl = document.getElementById(ids[i] + '_fs_lbl') ||
-        document.getElementById(ids[i] + '_lbl') ||
-        document.querySelector('label[for="' + ids[i] + '"]');
-      if (labelEl) {
-        const label = cleanLabel(labelEl.textContent);
-        if (label) return label;
+
+  // -- SS2 record -----------------------------------------------------------
+  function loadCurrentRecord() {
+    return new Promise(function (resolve) {
+      let settled = false;
+      function finish(rec) { if (!settled) { settled = true; resolve(rec || null); } }
+      try {
+        if (typeof require !== 'function') { finish(null); return; }
+        require(['N/currentRecord'], function (mod) {
+          try { finish(mod && typeof mod.get === 'function' ? mod.get() : null); } catch (_) { finish(null); }
+        }, function () { finish(null); });
+      } catch (_) { finish(null); }
+      setTimeout(function () { finish(null); }, SS2_LOAD_TIMEOUT_MS);
+    });
+  }
+
+  // -- DOM helpers ----------------------------------------------------------
+  function ownHidden(el) {
+    if (!el) return false;
+    try {
+      const s = window.getComputedStyle(el);
+      return s.display === 'none' || s.visibility === 'hidden';
+    } catch (_) { return false; }
+  }
+  // Only the element and its immediate field containers are checked. Inactive
+  // subtabs hide a distant ancestor, and fields on them are not "hidden".
+  function isRenderedHidden(el) {
+    if (!el) return false;
+    if (ownHidden(el)) return true;
+    const wrapper = el.closest('.uir-field-wrapper');
+    if (wrapper && wrapper !== el && ownHidden(wrapper)) return true;
+    const cell = el.closest('td');
+    if (cell && ownHidden(cell)) return true;
+    const row = el.closest('tr');
+    if (row && ownHidden(row)) return true;
+    return false;
+  }
+  // One pass over every element with an id (or form control name), bucketed by
+  // the field id it belongs to. A field usually has several: label span,
+  // wrapper anchor, display input, hidden value input, help link...
+  function buildDomIndex() {
+    const index = {};
+    function put(fid, el) {
+      if (!fid) return;
+      if (!index[fid]) index[fid] = [];
+      if (index[fid].indexOf(el) < 0) index[fid].push(el);
+    }
+    const withId = document.querySelectorAll('[id]');
+    for (let i = 0; i < withId.length; i++) {
+      const el = withId[i];
+      if (el.closest('.uir-machine-table-container, .uir-sublist')) continue;
+      put(normalizeBodyFieldId(el.id), el);
+    }
+    const named = document.querySelectorAll('#main_form input[name], #main_form select[name], #main_form textarea[name]');
+    for (let n = 0; n < named.length; n++) {
+      const el = named[n];
+      if (el.closest('.uir-machine-table-container, .uir-sublist')) continue;
+      put(normalizeBodyFieldId(el.getAttribute('name')), el);
+    }
+    return index;
+  }
+  function isControl(el) {
+    const tag = String(el && el.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'select' || tag === 'textarea';
+  }
+  function isHiddenInput(el) {
+    return isControl(el) && String(el.type || '').toLowerCase() === 'hidden';
+  }
+  // A field is visibly rendered if ANY of its elements is shown. A hidden
+  // value input (display:none by the browser) sitting next to a visible label
+  // must not make the field "hidden".
+  function anyRendered(candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+      const el = candidates[i];
+      if (isHiddenInput(el)) continue;
+      if (!isRenderedHidden(el)) return true;
+    }
+    return false;
+  }
+  function wrapperFieldId(w) {
+    const selectors = ['[id$="_fs_lbl"]', '[id$="_lbl"]', '[id$="_uir_label"]'];
+    for (let i = 0; i < selectors.length; i++) {
+      const lblEl = w.querySelector(selectors[i]);
+      if (lblEl && lblEl.id) {
+        const fid = normalizeBodyFieldId(lblEl.id);
+        if (fid) return { fid: fid, lblEl: lblEl };
       }
     }
-    for (let j = 0; j < ids.length; j++) {
-      const el = document.getElementById(ids[j]);
-      if (!el) continue;
-      const row = el.closest('tr, .uir-field-wrapper, .uir-field');
-      if (!row) continue;
-      const labelCandidate = row.querySelector('.smalltextnolink, .smalltext, .uir-label span, .uir-label, label');
-      const label = labelCandidate ? cleanLabel(labelCandidate.textContent) : '';
-      if (label) return label;
+    const ctrl = w.querySelector('input[id], select[id], textarea[id], [id$="_fs"], [id$="_val"]');
+    if (ctrl) {
+      const fid = normalizeBodyFieldId(ctrl.id);
+      if (fid) return { fid: fid, lblEl: null };
+    }
+    return null;
+  }
+  // NetSuite renders every body field inside .uir-field-wrapper and stamps the
+  // field type on it. This is the most reliable non-API source of type + label.
+  function collectDomFields() {
+    const map = {};
+    const wrappers = document.querySelectorAll('.uir-field-wrapper');
+    for (let i = 0; i < wrappers.length; i++) {
+      const w = wrappers[i];
+      if (w.closest('.uir-machine-table-container, .uir-sublist')) continue;
+      const found = wrapperFieldId(w);
+      if (!found) continue;
+      const type = w.getAttribute('data-field-type') || '';
+      let label = found.lblEl ? cleanLabel(found.lblEl.textContent) : '';
+      if (!label) label = cleanLabel(w.getAttribute('data-nsps-label') || '');
+      if (!label) {
+        const lblFallback = w.querySelector('.smalltextnolink, .uir-label span, .uir-label, label');
+        if (lblFallback) label = cleanLabel(lblFallback.textContent);
+      }
+      if (!map[found.fid]) {
+        map[found.fid] = { type: type, label: label, el: w };
+      } else {
+        if (!map[found.fid].type && type) map[found.fid].type = type;
+        if (!map[found.fid].label && label) map[found.fid].label = label;
+      }
+    }
+    return map;
+  }
+  // Only NetSuite's own label elements count as proof that an id is a field.
+  // (label[for] is what widgets embedded in inline-HTML fields tend to use.)
+  function nsLabelFor(fid) {
+    const ids = [fid + '_fs_lbl', fid + '_lbl', fid + '_fs_lbl_uir_label'];
+    for (let i = 0; i < ids.length; i++) {
+      const el = document.getElementById(ids[i]);
+      if (el) { const l = cleanLabel(el.textContent); if (l) return l; }
     }
     return '';
   }
-  function getSS2CurrentRecord() {
-    try {
-      if (window.currentRecord && typeof window.currentRecord.getFields === 'function') return window.currentRecord;
-    } catch(_) {}
-    try {
-      if (typeof require === 'function') {
-        let record = null;
-        require(['N/currentRecord'], function (mod) {
-          try { record = mod && typeof mod.get === 'function' ? mod.get() : null; } catch(_) {}
-        });
-        if (record && typeof record.getFields === 'function') return record;
-      }
-    } catch(_) {}
-    return null;
-  }
-  // Uses SuiteScript 1.0 globals (nlapiGetField, nlapiGetFieldValue) which are
-  // always available on NS record pages — no require() needed. Same approach
-  // as the NetSuite Advanced Field Help reference extension.
-
-  const result = { bodyFields: [], sublists: {} };
-  const currentRecord = getSS2CurrentRecord();
-
-  // Scan DOM for all field IDs
-  const seen = {};
-  const fieldIds = [];
-  const formEls = document.querySelectorAll('#main_form [id]');
-  for (let i = 0; i < formEls.length; i++) {
-    const rawId = formEls[i].id || '';
-    const tagName = String(formEls[i].tagName || '').toLowerCase();
-    const isFieldControl = tagName === 'input' || tagName === 'select' || tagName === 'textarea';
-    const isFieldDecoration = /(_display|_fs_lbl|_label|_lbl|_val|_fs)$/.test(rawId);
-    if (!isFieldControl && !isFieldDecoration) continue;
-
-    let id = normalizeBodyFieldId(rawId);
-    if (!id || seen[id]) continue;
-    // Skip sublist cells
-    if (formEls[i].closest('.uir-machine-table-container, .uir-sublist')) continue;
-    seen[id] = true;
-    fieldIds.push(id);
-  }
-
-  // Also try SS2 getFields() if available (catches hidden fields not in DOM)
-  try {
-    if (currentRecord && typeof currentRecord.getFields === 'function') {
-      const ss2Ids = currentRecord.getFields();
-      for (let j = 0; j < ss2Ids.length; j++) {
-        if (!seen[ss2Ids[j]]) { fieldIds.push(ss2Ids[j]); seen[ss2Ids[j]] = true; }
-      }
+  function domLabelFallback(fid) {
+    const ids = [fid + '_fs_lbl', fid + '_lbl', fid + '_fs_lbl_uir_label'];
+    for (let i = 0; i < ids.length; i++) {
+      const el = document.getElementById(ids[i]);
+      if (el) { const l = cleanLabel(el.textContent); if (l) return l; }
     }
-  } catch(_) {}
-
-  // Get metadata for each field using SS1 APIs
-  for (let i = 0; i < fieldIds.length; i++) {
-    const fid = fieldIds[i];
-    let label = '', type = 'unknown', value = null, text = null;
-    let isMandatory = false, isDisabled = false, isHidden = false;
-
-    // SS1: nlapiGetField
     try {
-      if (typeof nlapiGetField === 'function') {
-        const f = nlapiGetField(fid);
-        if (f) {
-          try { label = f.getLabel ? f.getLabel() : ''; } catch(_) {}
-          try { type = f.getType ? f.getType() : ''; } catch(_) {}
-          try { isMandatory = f.isMandatory ? f.isMandatory() : (f.required || false); } catch(_) {}
-          try { isDisabled = f.isDisabled ? f.isDisabled() : (f.disabled || false); } catch(_) {}
-          try { isHidden = f.isHidden ? f.isHidden() : false; } catch(_) {}
-        }
-      }
-    } catch(_) {}
-    try {
-      if ((!label || !type || type === 'unknown') && currentRecord && typeof currentRecord.getField === 'function') {
-        const f2 = currentRecord.getField({ fieldId: fid });
-        if (f2) {
-          if (!label) label = cleanLabel(f2.label || f2.name || '');
-          if (!type) type = f2.type || '';
-          if (!isMandatory && f2.isMandatory !== undefined) isMandatory = !!f2.isMandatory;
-          if (!isDisabled && f2.isDisabled !== undefined) isDisabled = !!f2.isDisabled;
-        }
-      }
-    } catch(_) {}
+      const forLbl = document.querySelector('label[for="' + cssEscape(fid) + '"], label[for="' + cssEscape(fid) + '_display"], label[for="inpt_' + cssEscape(fid) + '"]');
+      if (forLbl) { const l = cleanLabel(forLbl.textContent); if (l) return l; }
+    } catch (_) {}
+    return '';
+  }
 
-    // SS1: values (try multi-select first, fall back to single)
+  // -- SS1 helpers ----------------------------------------------------------
+  function ss1Field(fid) {
+    try { return typeof nlapiGetField === 'function' ? nlapiGetField(fid) : null; } catch (_) { return null; }
+  }
+  function ss1Label(f1) {
+    try { return cleanLabel(f1.getLabel ? f1.getLabel() : (f1.label || '')); } catch (_) { return ''; }
+  }
+  function ss1Type(f1) {
+    try { return String(f1.type || (f1.getType ? f1.getType() : '') || ''); } catch (_) { return ''; }
+  }
+  function ss1Value(fid) {
     try {
       if (typeof nlapiGetFieldValues === 'function') {
-        const multiVals = nlapiGetFieldValues(fid);
-        if (multiVals && multiVals.length > 0) {
-          value = multiVals.join(', ');
-        }
+        const multi = nlapiGetFieldValues(fid);
+        if (Array.isArray(multi) && multi.length > 1) return multi.join(', ');
+        if (Array.isArray(multi) && multi.length === 1) return multi[0];
       }
-    } catch(_) {}
-    if (value === null) {
-      try { if (typeof nlapiGetFieldValue === 'function') value = nlapiGetFieldValue(fid); } catch(_) {}
-    }
+    } catch (_) {}
+    try { if (typeof nlapiGetFieldValue === 'function') return nlapiGetFieldValue(fid); } catch (_) {}
+    return null;
+  }
+  function ss1Text(fid) {
     try {
       if (typeof nlapiGetFieldTexts === 'function') {
-        const multiTexts = nlapiGetFieldTexts(fid);
-        if (multiTexts && multiTexts.length > 0) {
-          text = multiTexts.join(', ');
-        }
+        const multi = nlapiGetFieldTexts(fid);
+        if (Array.isArray(multi) && multi.length > 0) return multi.join(', ');
       }
-    } catch(_) {}
-    if (!text) {
-      try { if (typeof nlapiGetFieldText === 'function') text = nlapiGetFieldText(fid); } catch(_) {}
-    }
-
-    // DOM hidden/disabled check — search multiple ID patterns NS uses
-    if (!isHidden || !isDisabled) {
-      const el = document.getElementById(fid) || document.getElementById(fid + '_display')
-                || document.getElementById(fid + '_val') || document.getElementById(fid + '_fs_lbl')
-                || document.getElementById('inpt_' + fid)
-                || (fid.charAt(fid.length - 1) === '_' ? document.getElementById(fid.slice(0, -1) + '_val') || document.getElementById(fid.slice(0, -1) + '_fs_lbl') : null);
-      if (el) {
-        if (!isHidden) {
-          const s = window.getComputedStyle(el);
-          if (s.display === 'none' || s.visibility === 'hidden') isHidden = true;
-          if (!isHidden) {
-            const row = el.closest('tr');
-            if (row) { const rs = window.getComputedStyle(row); if (rs.display === 'none' || rs.visibility === 'hidden') isHidden = true; }
-          }
-        }
-        // Check disabled from DOM if SS1 didn't report it
-        if (!isDisabled && (el.disabled || el.getAttribute('aria-disabled') === 'true' || el.readOnly)) {
-          isDisabled = true;
-        }
-      }
-      // If element not found by any ID pattern, check if there's a containing row
-      // with a label for this field — if yes, the field exists but uses non-standard rendering
-      if (!el) {
-        const lbl = document.querySelector('label[for="' + fid + '"], label[for="' + fid + '_display"]');
-        const rowEl = lbl ? lbl.closest('tr') : null;
-        if (rowEl) {
-          const rs = window.getComputedStyle(rowEl);
-          isHidden = (rs.display === 'none' || rs.visibility === 'hidden');
-        }
-        // Don't assume hidden just because we can't find the element —
-        // many fields (view mode, inline text) have non-standard DOM IDs
-      }
-    }
-
-    // DOM label fallback
-    if (!label) {
-      label = getDomFieldLabel(fid);
-    }
-
-    type = normType(type);
-    if (value !== null && value !== undefined && typeof value === 'object') {
-      try { value = JSON.parse(JSON.stringify(value)); } catch(_) { value = String(value); }
-    }
-
-    result.bodyFields.push({ id: fid, label, type, value: (value === undefined ? null : value), text: text || null, isMandatory, isDisabled, isHidden });
+    } catch (_) {}
+    try { if (typeof nlapiGetFieldText === 'function') return nlapiGetFieldText(fid); } catch (_) {}
+    return null;
+  }
+  function textOrNull(t) {
+    if (t === null || t === undefined) return null;
+    if (Array.isArray(t)) return t.length ? t.join(', ') : null;
+    const s = String(t);
+    return s === '' ? null : s;
   }
 
-  // Sublists — detect from DOM using multiple strategies
-  const slSeen = {};
+  // -- Body fields ----------------------------------------------------------
+  function buildBodyFields(rec, domFields) {
+    const ids = [];
+    const seen = {};
+    function add(id) { if (id && !seen[id]) { seen[id] = true; ids.push(id); } }
 
-  function trySublist(name) {
-    if (!name || slSeen[name]) return;
-    // SS1 check
+    let ss2Ids = [];
+    if (rec) { try { ss2Ids = rec.getFields() || []; } catch (_) { ss2Ids = []; } }
+    const ss2Usable = !!rec && ss2Ids.length > 0;
+
+    // 1. Everything the record knows about (includes fields not on the form).
+    for (let i = 0; i < ss2Ids.length; i++) add(String(ss2Ids[i]));
+
+    // 2. Everything NetSuite rendered as a field wrapper.
+    Object.keys(domFields).forEach(add);
+
+    // 3. Raw controls without a wrapper of their own. These need positive
+    //    evidence of being a field: a NetSuite label element, or API metadata
+    //    with a label / non-default type. "The API returned an object" is NOT
+    //    evidence: on a view-mode record both N/currentRecord.getField and
+    //    nlapiGetField hand back the same stub (type 'text', empty label) for
+    //    ANY id, including ids that do not exist. This keeps form plumbing
+    //    (whence / nlloc / entryformquerystring), the quick-find box and the
+    //    controls inside inline-HTML widgets (Sticky Notes) out of the list.
+    const formHeader = document.querySelector('#main_form .uir-form-header');
+    const controls = document.querySelectorAll('#main_form input[id], #main_form select[id], #main_form textarea[id]');
+    for (let c = 0; c < controls.length; c++) {
+      const el = controls[c];
+      if (el.closest('.uir-machine-table-container, .uir-sublist')) continue;
+      if (formHeader && formHeader.contains(el)) continue;
+      const ctlType = String(el.type || '').toLowerCase();
+      if (ctlType === 'button' || ctlType === 'submit' || ctlType === 'reset' || ctlType === 'image') continue;
+      const id = normalizeBodyFieldId(el.id);
+      if (!id || seen[id]) continue;
+      // A control nested in another field's wrapper belongs to that field's
+      // widget markup, not to the record.
+      const owner = el.closest('.uir-field-wrapper');
+      if (owner) {
+        const ownerField = wrapperFieldId(owner);
+        if (!ownerField || ownerField.fid !== id) continue;
+      }
+      let label = nsLabelFor(id);
+      let type = '';
+      if (rec) {
+        try {
+          const f = rec.getField({ fieldId: id });
+          if (f) { if (!label) label = cleanLabel(f.label || ''); type = String(f.type || ''); }
+        } catch (_) {}
+      }
+      if (!label && (!type || type.toLowerCase() === 'text')) {
+        const f1 = ss1Field(id);
+        if (f1) { label = ss1Label(f1); if (!type) type = ss1Type(f1); }
+      }
+      const confirmed = !!label || (!!type && type.toLowerCase() !== 'text');
+      if (!confirmed) continue;
+      if (ctlType === 'hidden' && !label) continue;
+      add(id);
+    }
+
+    const domIndex = buildDomIndex();
+
+    const out = [];
+    for (let i = 0; i < ids.length; i++) {
+      const fid = ids[i];
+      const dom = domFields[fid] || null;
+      let label = '', type = '', value = null, text = null;
+      let isMandatory = false, isDisabled = false, isHidden = false;
+      let ss2SaysHidden = false, flagsKnown = false, hiddenBy = '';
+
+      // SS2 field object (form-bound: null for fields not on the form)
+      let f2 = null;
+      if (rec) { try { f2 = rec.getField({ fieldId: fid }); } catch (_) { f2 = null; } }
+      // Metadata from the stub a view-mode record returns is meaningless (type
+      // 'text', empty label, isDisplay false for every id); use it only when
+      // getFields() works. Values via rec.getValue/getText are fine either way.
+      if (f2 && ss2Usable) {
+        try { type = String(f2.type || ''); } catch (_) {}
+        try { label = cleanLabel(f2.label || ''); } catch (_) {}
+        try { isMandatory = !!f2.isMandatory; isDisabled = !!f2.isDisabled; flagsKnown = true; } catch (_) {}
+        // View-mode stubs report isDisplay:false for everything; only trust the
+        // flags when the record is really usable (getFields() works).
+        try { ss2SaysHidden = ss2Usable && (f2.isDisplay === false || f2.isVisible === false); } catch (_) {}
+      }
+
+      // NetSuite markup
+      if (!type && dom && dom.type) type = dom.type;
+      if (!label && dom && dom.label) label = dom.label;
+
+      // Every element that belongs to this field
+      const candidates = (domIndex[fid] || []).slice();
+      if (dom && dom.el && candidates.indexOf(dom.el) < 0) candidates.unshift(dom.el);
+      const domEl = candidates.length ? candidates[0] : null;
+
+      // SS1 (last resort). Its 'text' default is only trusted with corroboration.
+      const f1 = ss1Field(fid);
+      if (f1) {
+        const l1 = ss1Label(f1);
+        if (!label && l1) label = l1;
+        if (!type) {
+          const t1 = ss1Type(f1);
+          if (t1 && (t1.toLowerCase() !== 'text' || l1 || domEl)) type = t1;
+        }
+        if (!flagsKnown) {
+          try { isMandatory = f1.isMandatory ? !!f1.isMandatory() : !!f1.required; } catch (_) {}
+          try { isDisabled = f1.isDisabled ? !!f1.isDisabled() : !!f1.disabled; } catch (_) {}
+          flagsKnown = true;
+        }
+      }
+      if (!label) label = domLabelFallback(fid);
+
+      // Hidden. The rendered page is the deciding vote:
+      //   - anything belonging to the field is visibly rendered  => not hidden
+      //   - the field has elements but all are collapsed         => hidden (DOM)
+      //   - nothing in the DOM, SS2 has a form-bound field object => trust SS2 flags
+      //   - nothing in the DOM and SS2 has no field object        => not on this form
+      if (candidates.length > 0) {
+        if (anyRendered(candidates)) {
+          isHidden = false;
+        } else {
+          isHidden = true;
+          hiddenBy = 'dom';
+        }
+      } else if (f2 && ss2Usable) {
+        isHidden = ss2SaysHidden;
+        if (isHidden) hiddenBy = 'ss2';
+      } else {
+        isHidden = true;
+        hiddenBy = 'not-on-form';
+      }
+      // Disabled from DOM only for real, visible controls. Readonly is NOT
+      // disabled: NetSuite dropdowns render as readonly text inputs.
+      if (!isDisabled) {
+        for (let c = 0; c < candidates.length; c++) {
+          if (isControl(candidates[c]) && !isHiddenInput(candidates[c]) && candidates[c].disabled) { isDisabled = true; break; }
+        }
+      }
+
+      // Values: SS2 first, SS1 fallback
+      if (rec) {
+        try { value = ser(rec.getValue({ fieldId: fid })); } catch (_) { value = null; }
+        try { text = textOrNull(rec.getText({ fieldId: fid })); } catch (_) { text = null; }
+      }
+      if (value === null) value = ss1Value(fid);
+      if (text === null) text = textOrNull(ss1Text(fid));
+      if (Array.isArray(value)) value = value.join(', ');
+      if (value !== null && typeof value === 'object') { try { value = JSON.stringify(value); } catch (_) { value = String(value); } }
+      if (text !== null && value !== null && String(text) === String(value)) text = null;
+
+      out.push({
+        id: fid,
+        label: label,
+        type: normType(type),
+        value: value === undefined ? null : value,
+        text: text,
+        isMandatory: isMandatory,
+        isDisabled: isDisabled,
+        isHidden: isHidden,
+        hiddenBy: isHidden ? hiddenBy : null
+      });
+    }
+    return out;
+  }
+
+  // -- Sublists -------------------------------------------------------------
+  function lineCountOf(rec, name) {
+    if (rec) {
+      try { const c = rec.getLineCount({ sublistId: name }); if (typeof c === 'number' && c >= 0) return c; } catch (_) {}
+    }
     try {
       if (typeof nlapiGetLineItemCount === 'function') {
         const c = nlapiGetLineItemCount(name);
-        if (c >= 0) { slSeen[name] = true; return; }
+        if (typeof c === 'number' && c >= 0) return c;
       }
-    } catch(_) {}
-    // SS2 check via window.currentRecord
-    try {
-      if (window.currentRecord && typeof window.currentRecord.getLineCount === 'function') {
-        const c = window.currentRecord.getLineCount({ sublistId: name });
-        if (c >= 0) { slSeen[name] = true; return; }
-      }
-    } catch(_) {}
+    } catch (_) {}
+    return -1;
   }
-
-  // Strategy 1: Look for sublist table containers (most reliable)
-  document.querySelectorAll('.uir-machine-table-container[id]').forEach((el) => {
-    // ID format: "item_splits" or similar
-    const m = el.id.match(/^(.+?)_splits$/);
-    if (m && m[1]) trySublist(m[1]);
-  });
-
-  // Strategy 2: Subtab elements
-  document.querySelectorAll('[id$="_subtab"], [id$="subtab"]').forEach((el) => {
-    const m = el.id.match(/^(.+?)_?subtab$/);
-    if (m && m[1]) trySublist(m[1]);
-  });
-
-  // Strategy 3: div__body elements
-  document.querySelectorAll('div[id^="div__body"]').forEach((el) => {
-    const name = el.id.replace(/^div__body/, '').replace(/tab$/, '');
-    if (name) trySublist(name);
-  });
-
-  // Strategy 4: Machine header rows (the actual sublist tables)
-  document.querySelectorAll('.uir-machine-headerrow').forEach((el) => {
-    const table = el.closest('table[id]');
-    if (table) {
-      const m = table.id.match(/^(.+?)(?:_splits|_layer|header)$/);
-      if (m && m[1]) trySublist(m[1]);
-    }
-  });
-
-  // Strategy 5: Known common sublist IDs
-  ['item','line','expense','apply','deposit','partners','salesteam',
-   'addresses','addressbook','links','mediaitem','payment','contacts',
-   'recmachcustrecord','custpage','inventoryassignment','billingschedule',
-   'revrecschedule','installment'].forEach(trySublist);
-
-  // Build sublist field data
-  Object.keys(slSeen).forEach((slId) => {
-    let lc = 0;
-    try {
-      if (typeof nlapiGetLineItemCount === 'function') lc = nlapiGetLineItemCount(slId);
-    } catch(_) {}
-    if (lc <= 0) {
-      try {
-        if (window.currentRecord) lc = window.currentRecord.getLineCount({ sublistId: slId });
-      } catch(_) {}
+  function discoverSublists(rec) {
+    const ids = [];
+    const seen = {};
+    function add(name, requireLines) {
+      if (!name || seen[name]) return;
+      const c = lineCountOf(rec, name);
+      if (c < 0 || (requireLines && c === 0)) return;
+      seen[name] = true;
+      ids.push(name);
     }
 
-    const fields = [];
-    const fieldSeen = {};
+    // Authoritative list from the record itself
+    if (rec) {
+      try { (rec.getSublists() || []).forEach((s) => add(String(s), false)); } catch (_) {}
+      if (ids.length > 0) return ids;
+    }
 
-    // Get field IDs from DOM headers (data-field attribute)
-    document.querySelectorAll('#' + slId + '_splits .uir-machine-headerrow td[data-field]').forEach((td) => {
-      const f = td.getAttribute('data-field');
-      if (f && !fieldSeen[f]) {
-        fieldSeen[f] = true;
-        const meta = { id: f, label: (td.textContent || '').trim(), type: 'unknown', value: null, text: null, isMandatory: false, isDisabled: false, isHidden: false };
-        if (lc > 0) {
-          try { if (typeof nlapiGetLineItemValue === 'function') meta.value = nlapiGetLineItemValue(slId, f, 1); } catch(_) {}
-          try { if (typeof nlapiGetLineItemText === 'function') meta.text = nlapiGetLineItemText(slId, f, 1); } catch(_) {}
-        }
-        fields.push(meta);
+    // DOM strategies (verified against the APIs)
+    document.querySelectorAll('.uir-machine-table-container[id]').forEach((el) => {
+      const m = el.id.match(/^(.+?)_splits$/);
+      if (m && m[1]) add(m[1], false);
+    });
+    document.querySelectorAll('[id$="_subtab"], [id$="subtab"]').forEach((el) => {
+      const m = el.id.match(/^(.+?)_?subtab$/);
+      if (m && m[1]) add(m[1], false);
+    });
+    document.querySelectorAll('div[id^="div__body"]').forEach((el) => {
+      const name = el.id.replace(/^div__body/, '').replace(/tab$/, '');
+      if (name) add(name, false);
+    });
+    document.querySelectorAll('.uir-machine-headerrow').forEach((el) => {
+      const table = el.closest('table[id]');
+      if (table) {
+        const m = table.id.match(/^(.+?)(?:_splits|_layer|header)$/);
+        if (m && m[1]) add(m[1], false);
       }
     });
+    // Guesses: only kept when they actually have lines
+    ['item', 'line', 'expense', 'apply', 'deposit', 'partners', 'salesteam', 'addressbook', 'links',
+      'mediaitem', 'payment', 'contacts', 'inventoryassignment', 'billingschedule', 'installment'
+    ].forEach((n) => add(n, true));
+    return ids;
+  }
+  function headerLabels(slId) {
+    const labels = {};
+    const container = document.getElementById(slId + '_splits') || document.getElementById(slId + '_layer');
+    if (!container) return labels;
+    container.querySelectorAll('.uir-machine-headerrow td, .uir-list-headerrow td').forEach((td) => {
+      let hid = td.getAttribute('data-nsps-id') || td.getAttribute('data-field') || '';
+      if (!hid) return;
+      hid = hid.replace(/^columnsheader_/, '');
+      if (hid.indexOf(slId + '_') === 0) hid = hid.substring(slId.length + 1);
+      if (!hid) return;
+      const lbl = cleanLabel(td.getAttribute('data-nsps-label') || td.textContent);
+      if (!labels[hid]) labels[hid] = lbl;
+    });
+    return labels;
+  }
+  function buildSublists(rec) {
+    const sublists = {};
+    discoverSublists(rec).forEach((slId) => {
+      const lc = Math.max(0, lineCountOf(rec, slId));
+      const labels = headerLabels(slId);
+      const ids = [];
+      const seen = {};
+      function add(id) { if (id && !seen[id]) { seen[id] = true; ids.push(id); } }
 
-    // Also scan header row by ID pattern: {sublistId}header
-    if (fields.length === 0) {
-      document.querySelectorAll('tr[id="' + slId + 'header"] td, #' + slId + '_header .listheadertd').forEach((td) => {
-        const f = td.getAttribute('data-field');
-        if (f && !fieldSeen[f]) {
-          fieldSeen[f] = true;
-          fields.push({ id: f, label: (td.textContent || '').trim(), type: 'unknown', value: null, text: null, isMandatory: false, isDisabled: false, isHidden: false });
+      if (rec) { try { (rec.getSublistFields({ sublistId: slId }) || []).forEach((f) => add(String(f))); } catch (_) {} }
+      Object.keys(labels).forEach(add);
+      if (ids.length === 0) {
+        const firstRow = document.querySelector('#' + slId + '_splits .uir-machine-row-odd, #' + slId + '_splits .uir-machine-row-even, #' + slId + 'row0');
+        if (firstRow) {
+          firstRow.querySelectorAll('input[id], select[id], textarea[id], span[id]').forEach((inp) => {
+            const fName = inp.id.replace(new RegExp('^' + slId + '_'), '').replace(/_\d+$/, '').replace(/_display$/, '').replace(/_formattedValue$/, '');
+            if (fName && fName !== slId) add(fName);
+          });
         }
-      });
-    }
-
-    // Fallback: scan first data row for input/select elements
-    if (fields.length === 0) {
-      const firstRow = document.querySelector('#' + slId + '_splits .uir-machine-row-odd, #' + slId + '_splits .uir-machine-row-even, #' + slId + 'row0');
-      if (firstRow) {
-        firstRow.querySelectorAll('input[id], select[id], textarea[id], span[id]').forEach((inp) => {
-          let fName = inp.id.replace(new RegExp('^' + slId + '_'), '').replace(/_\d+$/, '').replace(/_display$/, '');
-          if (fName && !fieldSeen[fName] && fName !== slId) {
-            fieldSeen[fName] = true;
-            let val = null, txt = null;
-            try { if (typeof nlapiGetLineItemValue === 'function' && lc > 0) val = nlapiGetLineItemValue(slId, fName, 1); } catch(_) {}
-            try { if (typeof nlapiGetLineItemText === 'function' && lc > 0) txt = nlapiGetLineItemText(slId, fName, 1); } catch(_) {}
-            fields.push({ id: fName, label: '', type: 'unknown', value: val, text: txt, isMandatory: false, isDisabled: false, isHidden: false });
-          }
-        });
       }
-    }
 
-    // SS2: try getSublistFields for any we missed
-    try {
-      if (window.currentRecord && typeof window.currentRecord.getSublistFields === 'function') {
-        const ss2Fields = window.currentRecord.getSublistFields({ sublistId: slId }) || [];
-        for (let fi = 0; fi < ss2Fields.length; fi++) {
-          if (!fieldSeen[ss2Fields[fi]]) {
-            fieldSeen[ss2Fields[fi]] = true;
-            const meta = { id: ss2Fields[fi], label: '', type: 'unknown', value: null, text: null, isMandatory: false, isDisabled: false, isHidden: false };
-            try {
-              const sf = window.currentRecord.getSublistField({ sublistId: slId, fieldId: ss2Fields[fi], line: 0 });
-              if (sf) { meta.label = sf.label || ''; meta.type = normType(sf.type || ''); }
-            } catch(_) {}
-            if (lc > 0) {
-              try { meta.value = window.currentRecord.getSublistValue({ sublistId: slId, fieldId: ss2Fields[fi], line: 0 }); } catch(_) {}
-              try { meta.text = window.currentRecord.getSublistText({ sublistId: slId, fieldId: ss2Fields[fi], line: 0 }); } catch(_) {}
+      const hasHeaderInfo = Object.keys(labels).length > 0;
+      const fields = ids.map((f) => {
+        const meta = { id: f, label: labels[f] || '', type: 'Unknown', value: null, text: null, isMandatory: false, isDisabled: false, isHidden: false, hiddenBy: null };
+        let sf = null;
+        if (rec) {
+          if (lc > 0) { try { sf = rec.getSublistField({ sublistId: slId, fieldId: f, line: 0 }); } catch (_) { sf = null; } }
+          if (!sf && typeof rec.getCurrentSublistField === 'function') {
+            try { sf = rec.getCurrentSublistField({ sublistId: slId, fieldId: f }); } catch (_) { sf = null; }
+          }
+        }
+        if (sf) {
+          try { if (sf.type) meta.type = normType(sf.type); } catch (_) {}
+          try { if (sf.label) meta.label = cleanLabel(sf.label); } catch (_) {}
+          try { meta.isMandatory = !!sf.isMandatory; meta.isDisabled = !!sf.isDisabled; } catch (_) {}
+        }
+        // Hidden column: a rendered header cell is the deciding vote. Only when
+        // NetSuite drew no header cells at all do the SS2 flags get a say.
+        if (hasHeaderInfo) {
+          if (!labels.hasOwnProperty(f)) { meta.isHidden = true; meta.hiddenBy = 'dom'; }
+        } else if (sf) {
+          try { if (sf.isDisplay === false || sf.isVisible === false) { meta.isHidden = true; meta.hiddenBy = 'ss2'; } } catch (_) {}
+        }
+        if (!sf && lc > 0) {
+          try {
+            if (typeof nlapiGetLineItemField === 'function') {
+              const lf = nlapiGetLineItemField(slId, f, 1);
+              if (lf) {
+                const t1 = ss1Type(lf);
+                const l1 = ss1Label(lf);
+                if (!meta.label && l1) meta.label = l1;
+                if (t1 && (t1.toLowerCase() !== 'text' || l1 || meta.label)) meta.type = normType(t1);
+              }
             }
-            fields.push(meta);
-          }
+          } catch (_) {}
         }
-      }
-    } catch(_) {}
+        if (lc > 0) {
+          if (rec) {
+            try { meta.value = ser(rec.getSublistValue({ sublistId: slId, fieldId: f, line: 0 })); } catch (_) {}
+            try { meta.text = textOrNull(rec.getSublistText({ sublistId: slId, fieldId: f, line: 0 })); } catch (_) {}
+          }
+          if (meta.value === null) { try { if (typeof nlapiGetLineItemValue === 'function') meta.value = nlapiGetLineItemValue(slId, f, 1); } catch (_) {} }
+          if (meta.text === null) { try { if (typeof nlapiGetLineItemText === 'function') meta.text = textOrNull(nlapiGetLineItemText(slId, f, 1)); } catch (_) {} }
+          if (Array.isArray(meta.value)) meta.value = meta.value.join(', ');
+          if (meta.text !== null && meta.value !== null && String(meta.text) === String(meta.value)) meta.text = null;
+        }
+        return meta;
+      });
 
-    result.sublists[slId] = { fields, lineCount: lc };
+      sublists[slId] = { fields: fields, lineCount: lc };
+    });
+    return sublists;
+  }
+
+  // -- Main -----------------------------------------------------------------
+  return loadCurrentRecord().then(function (rec) {
+    const result = { bodyFields: [], sublists: {}, meta: { ss2: !!rec, recordType: null, recordId: null } };
+    try { if (rec) { result.meta.recordType = rec.type || null; result.meta.recordId = rec.id || null; } } catch (_) {}
+    if (!result.meta.recordType) {
+      try { if (typeof nlapiGetRecordType === 'function') result.meta.recordType = nlapiGetRecordType() || null; } catch (_) {}
+      try { if (typeof nlapiGetRecordId === 'function') result.meta.recordId = nlapiGetRecordId() || null; } catch (_) {}
+    }
+    try {
+      const domFields = collectDomFields();
+      result.bodyFields = buildBodyFields(rec, domFields);
+    } catch (e) {
+      result.meta.bodyError = e && e.message ? e.message : String(e);
+    }
+    try {
+      result.sublists = buildSublists(rec);
+    } catch (e) {
+      result.meta.sublistError = e && e.message ? e.message : String(e);
+    }
+    return result;
+  }).catch(function (e) {
+    return { error: 'Field scan failed: ' + (e && e.message ? e.message : String(e)) };
   });
-
-  return result;
 }
 
 function feGetSelectOptionsFn(fieldId, sublistId, line) {
-  if (!fieldId) return {fieldId, options:[]};
-  const options = [];
+  if (!fieldId) return { fieldId: fieldId, options: [] };
+  const lineIdx = (line !== null && line !== undefined) ? Number(line) : 0;
 
-  // Method 1: Read data-options from NS dropdown DOM element (same as reference extension)
-  try {
-    const dropdown = document.querySelector('.ns-dropdown[data-name="' + fieldId + '"]');
-    if (dropdown) {
-      const dataOpts = dropdown.getAttribute('data-options');
+  function push(list, v, t) {
+    if (v === null || v === undefined || v === '') return;
+    list.push({ value: String(v), text: (t !== null && t !== undefined && t !== '') ? String(t) : String(v) });
+  }
+  function fromDom() {
+    const options = [];
+    if (sublistId) return options;
+    try {
+      const dropdown = document.querySelector('.ns-dropdown[data-name="' + fieldId + '"]');
+      const dataOpts = dropdown ? dropdown.getAttribute('data-options') : null;
       if (dataOpts) {
         const parsed = JSON.parse(dataOpts);
-        for (let i = 0; i < parsed.length; i++) {
-          if (parsed[i].value) options.push({ value: String(parsed[i].value), text: parsed[i].text || String(parsed[i].value) });
-        }
+        for (let i = 0; i < parsed.length; i++) push(options, parsed[i].value, parsed[i].text);
       }
+    } catch (_) {}
+    if (options.length === 0) {
+      try {
+        const inpt = document.getElementsByName('inpt_' + fieldId)[0];
+        if (inpt && typeof getDropdown === 'function') {
+          const dd = getDropdown(inpt);
+          if (dd && dd.valueArray) {
+            for (let i = 0; i < dd.valueArray.length; i++) push(options, dd.valueArray[i], dd.textArray ? dd.textArray[i] : null);
+          }
+        }
+      } catch (_) {}
     }
-  } catch(_) {}
-
-  // Method 2: Read from the native select dropdown (getDropdown pattern from reference)
-  if (options.length === 0) {
+    return options;
+  }
+  function fromSS1() {
+    const options = [];
     try {
-      const inpt = document.getElementsByName('inpt_' + fieldId)[0];
-      if (inpt && typeof getDropdown === 'function') {
-        const dd = getDropdown(inpt);
-        if (dd && dd.valueArray) {
-          for (let i = 0; i < dd.valueArray.length; i++) {
-            if (dd.valueArray[i]) options.push({ value: String(dd.valueArray[i]), text: dd.textArray[i] || String(dd.valueArray[i]) });
-          }
-        }
+      let f = null;
+      if (sublistId && typeof nlapiGetLineItemField === 'function') f = nlapiGetLineItemField(sublistId, fieldId, lineIdx + 1);
+      else if (!sublistId && typeof nlapiGetField === 'function') f = nlapiGetField(fieldId);
+      if (f && typeof f.getSelectOptions === 'function') {
+        const raw = f.getSelectOptions() || [];
+        for (let i = 0; i < raw.length; i++) push(options, raw[i].getId(), raw[i].getText());
       }
-    } catch(_) {}
+    } catch (_) {}
+    return options;
+  }
+  function fromSS2() {
+    return new Promise(function (resolve) {
+      let settled = false;
+      function finish(list) { if (!settled) { settled = true; resolve(list || []); } }
+      try {
+        if (typeof require !== 'function') { finish([]); return; }
+        require(['N/currentRecord'], function (mod) {
+          const options = [];
+          try {
+            const rec = mod.get();
+            let field = null;
+            if (sublistId) {
+              try { field = rec.getSublistField({ sublistId: sublistId, fieldId: fieldId, line: lineIdx }); } catch (_) { field = null; }
+              if (!field && typeof rec.getCurrentSublistField === 'function') {
+                try { field = rec.getCurrentSublistField({ sublistId: sublistId, fieldId: fieldId }); } catch (_) { field = null; }
+              }
+            } else {
+              field = rec.getField({ fieldId: fieldId });
+            }
+            if (field && typeof field.getSelectOptions === 'function') {
+              let raw = null;
+              try { raw = field.getSelectOptions({}); } catch (_) { raw = field.getSelectOptions(); }
+              for (let i = 0; i < (raw || []).length; i++) push(options, raw[i].value, raw[i].text);
+            }
+          } catch (_) {}
+          finish(options);
+        }, function () { finish([]); });
+      } catch (_) { finish([]); }
+      setTimeout(function () { finish([]); }, 8000);
+    });
   }
 
-  // Method 3: SS2 field.getSelectOptions if window.currentRecord is available
-  if (options.length === 0) {
-    try {
-      if (window.currentRecord && typeof window.currentRecord.getField === 'function') {
-        const field = sublistId
-          ? window.currentRecord.getSublistField({ sublistId, fieldId, line: (line != null ? line : 0) })
-          : window.currentRecord.getField({ fieldId });
-        if (field && typeof field.getSelectOptions === 'function') {
-          const raw = field.getSelectOptions({ filter: undefined, operator: undefined });
-          if (raw && raw.length) {
-            for (let i = 0; i < raw.length; i++) options.push({ value: String(raw[i].value), text: raw[i].text || String(raw[i].value) });
-          }
-        }
-      }
-    } catch(_) {}
-  }
-
-  // Method 4: SS1 nlapiGetField().getSelectOptions()
-  if (options.length === 0) {
-    try {
-      if (typeof nlapiGetField === 'function') {
-        const f = nlapiGetField(fieldId);
-        if (f && typeof f.getSelectOptions === 'function') {
-          const raw = f.getSelectOptions();
-          if (raw && raw.length) {
-            for (let i = 0; i < raw.length; i++) options.push({ value: String(raw[i].getId()), text: raw[i].getText() || String(raw[i].getId()) });
-          }
-        }
-      }
-    } catch(_) {}
-  }
-
-  return { fieldId, options };
+  const domOptions = fromDom();
+  if (domOptions.length > 0) return { fieldId: fieldId, options: domOptions };
+  return fromSS2().then(function (ss2Options) {
+    if (ss2Options.length > 0) return { fieldId: fieldId, options: ss2Options };
+    return { fieldId: fieldId, options: fromSS1() };
+  });
 }
 
 function feSetFieldValueFn(fieldId, value, sublistId, line) {
-  if (!fieldId) return {error:'fieldId required'};
+  if (!fieldId) return { error: 'fieldId required' };
 
-  // Use SS1 globals (always available, no require needed)
-  try {
-    if (sublistId && line != null && typeof nlapiSetLineItemValue === 'function') {
-      nlapiSetLineItemValue(sublistId, fieldId, line + 1, value); // SS1 uses 1-based lines
-      const newValue = typeof nlapiGetLineItemValue === 'function' ? nlapiGetLineItemValue(sublistId, fieldId, line + 1) : value;
-      const newText = typeof nlapiGetLineItemText === 'function' ? nlapiGetLineItemText(sublistId, fieldId, line + 1) : null;
-      return { success: true, fieldId, newValue, newText };
-    } else if (typeof nlapiSetFieldValue === 'function') {
-      nlapiSetFieldValue(fieldId, value, true, false);
-      const newValue = typeof nlapiGetFieldValue === 'function' ? nlapiGetFieldValue(fieldId) : value;
-      const newText = typeof nlapiGetFieldText === 'function' ? nlapiGetFieldText(fieldId) : null;
-      return { success: true, fieldId, newValue, newText };
+  function ser(v) {
+    if (v === null || v === undefined) return null;
+    if (v instanceof Date) return v.toISOString();
+    if (Array.isArray(v)) return v.join(', ');
+    if (typeof v === 'object') { try { return JSON.stringify(v); } catch (_) { return String(v); } }
+    return v;
+  }
+  // The UI sends strings; SS2 setValue wants typed values.
+  function coerce(fieldType, raw) {
+    const t = String(fieldType || '').toLowerCase();
+    const s = raw === null || raw === undefined ? '' : String(raw);
+    if (t === 'checkbox') return /^(t|true|1|yes|y)$/i.test(s.trim());
+    if (t === 'multiselect') return s.trim() === '' ? [] : s.split(',').map((x) => x.trim()).filter(Boolean);
+    if (/^(integer|posinteger|float|posfloat|nonnegfloat|currency|poscurrency|nonnegcurrency|currency2|percent|rate|ratehighprecision|quantity|posquantity)$/.test(t)) {
+      const n = Number(s.replace(/[,\s]/g, ''));
+      return isNaN(n) ? s : n;
     }
-  } catch(e) { return { error: e.message }; }
+    if (/^(date|datetime|datetimetz)$/.test(t)) {
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? s : d;
+    }
+    return s;
+  }
+  function viaSS1() {
+    try {
+      if (sublistId && line !== null && line !== undefined && typeof nlapiSetLineItemValue === 'function') {
+        nlapiSetLineItemValue(sublistId, fieldId, Number(line) + 1, value);
+        const newValue = typeof nlapiGetLineItemValue === 'function' ? nlapiGetLineItemValue(sublistId, fieldId, Number(line) + 1) : value;
+        const newText = typeof nlapiGetLineItemText === 'function' ? nlapiGetLineItemText(sublistId, fieldId, Number(line) + 1) : null;
+        return { success: true, fieldId: fieldId, newValue: newValue, newText: newText };
+      }
+      if (!sublistId && typeof nlapiSetFieldValue === 'function') {
+        let v = value;
+        if (typeof v === 'boolean') v = v ? 'T' : 'F';
+        else if (/^(true|false)$/i.test(String(v || ''))) v = /^true$/i.test(String(v)) ? 'T' : 'F';
+        nlapiSetFieldValue(fieldId, v, true, false);
+        const newValue = typeof nlapiGetFieldValue === 'function' ? nlapiGetFieldValue(fieldId) : v;
+        const newText = typeof nlapiGetFieldText === 'function' ? nlapiGetFieldText(fieldId) : null;
+        return { success: true, fieldId: fieldId, newValue: newValue, newText: newText };
+      }
+    } catch (e) { return { error: e.message || String(e) }; }
+    return { error: 'No NetSuite API available to set field value' };
+  }
 
-  return { error: 'No NetSuite API available to set field value' };
+  // Sublist lines: SS1 is simpler and does not disturb the current line.
+  if (sublistId) return viaSS1();
+
+  return new Promise(function (resolve) {
+    let settled = false;
+    function finish(r) { if (!settled) { settled = true; resolve(r); } }
+    try {
+      if (typeof require !== 'function') { finish(viaSS1()); return; }
+      require(['N/currentRecord'], function (mod) {
+        try {
+          const rec = mod.get();
+          let field = null;
+          try { field = rec.getField({ fieldId: fieldId }); } catch (_) { field = null; }
+          if (!field) { finish(viaSS1()); return; }
+          rec.setValue({ fieldId: fieldId, value: coerce(field.type, value), ignoreFieldChange: false });
+          let newText = null;
+          try { newText = rec.getText({ fieldId: fieldId }); } catch (_) {}
+          finish({ success: true, fieldId: fieldId, newValue: ser(rec.getValue({ fieldId: fieldId })), newText: ser(newText) });
+        } catch (e) {
+          finish({ error: e.message || String(e) });
+        }
+      }, function () { finish(viaSS1()); });
+    } catch (_) { finish(viaSS1()); }
+    setTimeout(function () { finish(viaSS1()); }, 4000);
+  });
 }
 
 function feSetFieldAttributeFn(fieldId, attr, value) {

@@ -98,6 +98,8 @@
     /* ── Initialisation ───────────────────────────────────────────── */
 
     async function init() {
+        // Version comes from the manifest so the About row and footer can never drift from it.
+        document.querySelectorAll('.tacta-opt-footer-version, .tacta-opt-about-value.tacta-opt-mono').forEach((el) => { el.textContent = 'v' + chrome.runtime.getManifest().version; });
         await loadState();
         renderFeatureList();
         $featureTotal.textContent = `${features.length} total`;
@@ -216,7 +218,7 @@
         const payload = {
             _meta: {
                 extension:  'TactaSuite NS Toolkit',
-                version:    '1.0.0',
+                version:    chrome.runtime.getManifest().version,
                 exportedAt: new Date().toISOString(),
             },
             featureStates,

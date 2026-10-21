@@ -147,6 +147,8 @@
     /* ── Initialisation ───────────────────────────────────────────── */
 
     async function init() {
+        // Version comes from the manifest so the badge can never drift from it.
+        document.querySelectorAll('.tacta-version').forEach((el) => { el.textContent = 'v' + chrome.runtime.getManifest().version; });
         await loadState();
         detectEnvironment();
         renderFeatureGroups();
