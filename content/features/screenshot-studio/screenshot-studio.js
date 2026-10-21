@@ -255,7 +255,13 @@
             // 13 to 19 digits with optional single space/dash separators, Luhn-valid, not part of a longer token
             list.push({
                 re: /(?<![A-Za-z0-9-])\d(?:[ -]?\d){12,18}(?![A-Za-z0-9-])/g,
-                accept: function (hit) { return luhnOk(hit.replace(/[ -]/g, '')); }
+                accept: function (hit) {
+                    var bare = hit.replace(/[ -]/g, '');
+                    // A bare 15-digit run is an IMEI (also Luhn-valid) far more often than an
+                    // unformatted Amex number; Amex numbers on screen carry separators.
+                    if (bare.length === 15 && bare === hit) return false;
+                    return luhnOk(bare);
+                }
             });
         }
         if (s.currency) {
