@@ -220,8 +220,23 @@
 
     /**
      * Build the list of active matchers from settings.
-     * Each matcher: { re: RegExp (global), cellsOnly?: boolean }
+     * Each matcher: { re: RegExp (global), cellsOnly?: boolean, accept?: fn(hit) }
+     *
+     * NetSuite pages are full of long digit runs that are NOT secrets:
+     * document numbers (SOR2205085076), internal ids, IMEIs, line keys. The
+     * patterns therefore require the formatting people actually type for a
+     * phone number or tax id, refuse to start inside an alphanumeric token,
+     * and card numbers must pass the Luhn check.
      */
+    function luhnOk(digits) {
+        var sum = 0, dbl = false;
+        for (var i = digits.length - 1; i >= 0; i--) {
+            var d = digits.charCodeAt(i) - 48;
+            if (dbl) { d *= 2; if (d > 9) d -= 9; }
+            sum += d; dbl = !dbl;
+        }
+        return sum % 10 === 0;
+    }
     function buildMatchers(s) {
         var list = [];
         if (!s.mask) return list;
@@ -229,15 +244,19 @@
             list.push({ re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g });
         }
         if (s.phones) {
-            list.push({ re: /(?<![\d-])(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?![\d-])/g });
+            // (555) 123-4567, 555-123-4567, 555.123.4567, +1 555 123 4567: separators required
+            list.push({ re: /(?<![A-Za-z0-9-])(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?![A-Za-z0-9-])/g });
         }
         if (s.taxIds) {
-            // SSN/ITIN 123-45-6789, EIN 12-3456789, or 9 bare digits
-            list.push({ re: /(?<![\d-])(?:\d{3}-?\d{2}-?\d{4}|\d{2}-\d{7})(?![\d-])/g });
+            // SSN/ITIN 123-45-6789 or EIN 12-3456789; bare 9-digit runs are internal ids far more often than tax ids
+            list.push({ re: /(?<![A-Za-z0-9-])(?:\d{3}-\d{2}-\d{4}|\d{2}-\d{7})(?![A-Za-z0-9-])/g });
         }
         if (s.cards) {
-            // 13 to 19 digits with optional single space/dash separators
-            list.push({ re: /(?<![\d-])\d(?:[ -]?\d){12,18}(?![\d-])/g });
+            // 13 to 19 digits with optional single space/dash separators, Luhn-valid, not part of a longer token
+            list.push({
+                re: /(?<![A-Za-z0-9-])\d(?:[ -]?\d){12,18}(?![A-Za-z0-9-])/g,
+                accept: function (hit) { return luhnOk(hit.replace(/[ -]/g, '')); }
+            });
         }
         if (s.currency) {
             list.push({ re: /[$€£]\s?-?\(?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?\)?/g });
@@ -260,6 +279,7 @@
             var hit;
             while ((hit = matcher.re.exec(text)) !== null) {
                 if (hit[0].length === 0) { matcher.re.lastIndex++; continue; }
+                if (matcher.accept && !matcher.accept(hit[0])) continue;
                 ranges.push([hit.index, hit.index + hit[0].length]);
             }
         }
@@ -281,7 +301,12 @@
         for (var m = 0; m < matchers.length; m++) {
             if (matchers[m].cellsOnly && !cellsOk) continue;
             matchers[m].re.lastIndex = 0;
-            if (matchers[m].re.test(text)) { matchers[m].re.lastIndex = 0; return true; }
+            var hit;
+            while ((hit = matchers[m].re.exec(text)) !== null) {
+                if (hit[0].length === 0) { matchers[m].re.lastIndex++; continue; }
+                if (!matchers[m].accept || matchers[m].accept(hit[0])) { matchers[m].re.lastIndex = 0; return true; }
+            }
+            matchers[m].re.lastIndex = 0;
         }
         return false;
     }
@@ -546,8 +571,15 @@
             window.TactaDOM.showToast('Screenshot captured: ' + note, 'success', 2500);
         }).catch(function (err) {
             if (session) { try { session.restore(); } catch (_) { /* ignore */ } }
-            setStatus('Capture failed: ' + (err && err.message ? err.message : String(err)), 'error');
-            try { window.TactaDOM.showToast('Screenshot failed: ' + err.message, 'error', 4000); } catch (_) { /* ignore */ }
+            var msg = err && err.message ? err.message : String(err);
+            // captureVisibleTab needs the one-time activeTab grant that only a click
+            // on the toolbar icon provides. Opening the studio another way (console
+            // hook, automation) lands here.
+            if (/activeTab|all_urls/i.test(msg)) {
+                msg = 'Chrome needs permission to capture this tab. Click the TactaSuite toolbar icon, then press Capture again.';
+            }
+            setStatus('Capture failed: ' + msg, 'error');
+            try { window.TactaDOM.showToast('Screenshot failed: ' + msg, 'error', 5000); } catch (_) { /* ignore */ }
         }).then(function () {
             _busy = false;
             setButtonsDisabled(false);
