@@ -89,6 +89,7 @@
         '.tacta-ai-set-cmd { display: flex; align-items: center; gap: 8px; margin: 4px 0; } .tacta-ai-set-cmd code { flex: 1; padding: 4px 8px; font-family: var(--tacta-font-mono, monospace); font-size: 12px; background: var(--tacta-bg-elevated, #fff); border: 1px solid var(--tacta-border, #ccc); border-radius: 4px; overflow-x: auto; white-space: nowrap; }',
         '.tacta-ai-set-muted { color: var(--tacta-text-muted, #666); }',
         '.tacta-ai-set-pick { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; cursor: pointer; }',
+        '.tacta-ai-set-row-sso .tacta-ai-set-input { max-width: 420px; }',
         '.tacta-ai-set-hidden { display: none !important; }',
         '.tacta-ai-set-guide details { border: 1px solid var(--tacta-border); border-radius: var(--tacta-radius-md); margin-top: var(--tacta-space-md); background: var(--tacta-bg-elevated); }',
         '.tacta-ai-set-guide summary { cursor: pointer; padding: var(--tacta-space-sm) var(--tacta-space-md); font-weight: 600; font-size: var(--tacta-font-size-sm); color: var(--tacta-text-secondary); }',
@@ -180,7 +181,6 @@
     }
 
     var HELPER_DEFAULT_URL = 'http://127.0.0.1:38790';
-    var HELPER_LOGIN_CMD = 'aws sso login --profile aws-code-ai';
     var HELPER_START_CMD = 'cd tools\\bedrock-token-helper && npm install && npm start';
 
     /**
@@ -295,15 +295,169 @@
             });
             return el('div', { className: 'tacta-ai-set-cmd' }, [el('code', { textContent: cmd }), copy]);
         }
+        // ── AWS sign-in form (IAM Identity Center / SSO) ──
+        function ssoField(placeholder, hint) {
+            var input = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: placeholder, spellcheck: 'false', autocomplete: 'off' });
+            input._hint = hint;
+            return input;
+        }
+        var ssoModeSso = el('input', { type: 'radio', name: 'tacta-ai-helper-mode', value: 'sso', checked: true });
+        var ssoModeProfile = el('input', { type: 'radio', name: 'tacta-ai-helper-mode', value: 'profile' });
+        var ssoName = ssoField('e.g. aws-code-ai', 'A name for this login (in CLI mode: the existing profile name)');
+        var ssoStartUrl = ssoField('https://d-xxxxxxxxxx.awsapps.com/start', 'sso_start_url from your AWS access portal');
+        var ssoRegion = ssoField('us-east-1', 'sso_region: where IAM Identity Center is enabled');
+        var ssoAccountId = ssoField('123456789012', 'sso_account_id: the 12-digit AWS account with Bedrock');
+        var ssoRoleName = ssoField('aws-code-ai', 'sso_role_name: the permission set to assume');
+        var ssoScopes = ssoField('sso:account:access', 'sso_registration_scopes');
+        var ssoImport = el('select', { className: 'tacta-ai-set-select' }, [el('option', { value: '', textContent: 'Import from an AWS CLI profile on this computer...' })]);
+        var ssoSaveBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Save to helper' });
+        var ssoLoginBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-primary tacta-ai-set-btn-sm', type: 'button', textContent: 'Sign in with AWS' });
+        var ssoLogoutBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Sign out' });
+        var ssoStatus = el('span', { className: 'tacta-ai-set-status' });
+        var ssoRows = [
+            ['Login name', ssoName], ['SSO start URL', ssoStartUrl], ['SSO region', ssoRegion],
+            ['Account id', ssoAccountId], ['Role name', ssoRoleName], ['Scopes', ssoScopes]
+        ].map(function (pair) {
+            return el('div', { className: 'tacta-ai-set-row tacta-ai-set-row-sso' }, [
+                el('div', { className: 'tacta-ai-set-label' }, [pair[0], el('small', { textContent: pair[1]._hint })]),
+                el('div', { className: 'tacta-ai-set-control' }, [pair[1]])
+            ]);
+        });
+        var ssoOnlyRows = ssoRows.slice(1);
+        function helperBase() { return (helperUrlInput.value.trim() || HELPER_DEFAULT_URL).replace(/\/+$/, ''); }
+        function helperFetch(pathname, opts) {
+            opts = opts || {};
+            return fetch(helperBase() + pathname, {
+                method: opts.method || 'GET',
+                headers: Object.assign({ 'X-Tacta-Helper': '1' }, opts.body ? { 'Content-Type': 'application/json' } : {}),
+                body: opts.body ? JSON.stringify(opts.body) : undefined,
+                cache: 'no-store'
+            }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status)); return j; }); });
+        }
+        function syncSsoMode() {
+            var profileMode = ssoModeProfile.checked;
+            ssoOnlyRows.forEach(function (row) { row.classList.toggle('tacta-ai-set-hidden', profileMode); });
+            ssoLoginBtn.classList.toggle('tacta-ai-set-hidden', profileMode);
+            ssoLogoutBtn.classList.toggle('tacta-ai-set-hidden', profileMode);
+        }
+        ssoModeSso.addEventListener('change', syncSsoMode);
+        ssoModeProfile.addEventListener('change', syncSsoMode);
+        function fillSso(c) {
+            if (!c) return;
+            ssoModeProfile.checked = c.mode === 'profile';
+            ssoModeSso.checked = !ssoModeProfile.checked;
+            ssoName.value = c.profileName || '';
+            ssoStartUrl.value = c.ssoStartUrl || '';
+            ssoRegion.value = c.ssoRegion || 'us-east-1';
+            ssoAccountId.value = c.ssoAccountId || '';
+            ssoRoleName.value = c.ssoRoleName || '';
+            ssoScopes.value = c.ssoRegistrationScopes || 'sso:account:access';
+            if (c.region && !regionInput.value.trim()) regionInput.value = c.region;
+            syncSsoMode();
+        }
+        function collectSso() {
+            return {
+                mode: ssoModeProfile.checked ? 'profile' : 'sso',
+                profileName: ssoName.value.trim(),
+                ssoStartUrl: ssoStartUrl.value.trim(),
+                ssoRegion: ssoRegion.value.trim() || 'us-east-1',
+                ssoAccountId: ssoAccountId.value.trim(),
+                ssoRoleName: ssoRoleName.value.trim(),
+                region: regionInput.value.trim() || 'us-east-1',
+                ssoRegistrationScopes: ssoScopes.value.trim() || 'sso:account:access'
+            };
+        }
+        function describeHealth(h) {
+            if (!h || !h.ok) return ['Helper not reachable. Start it with the command below.', 'warn'];
+            if (!h.configured) return ['Helper running, not configured yet. Fill in the fields and click Save to helper.', 'warn'];
+            if (h.mode === 'profile') return ['Helper running with AWS CLI profile ' + h.profile + ' (' + h.region + '). If calls fail, run: aws sso login --profile ' + h.profile, 'ok'];
+            if (h.login && h.login.state === 'pending') return ['Waiting for you to approve the sign-in in the browser tab.', 'warn'];
+            if (h.signedIn) return ['Signed in as ' + h.role + ' @ ' + h.account + ' until ' + new Date(h.sessionExpiresAt).toLocaleString() + '. Bedrock region ' + h.region + '.', 'ok'];
+            return ['Configured (' + h.role + ' @ ' + h.account + ') but not signed in. Click Sign in with AWS.', 'warn'];
+        }
+        var _cliProfiles = [];
+        function loadHelperConfig() {
+            setStatus(ssoStatus, 'Contacting helper...', null);
+            return helperFetch('/config').then(function (j) {
+                fillSso(j.config);
+                _cliProfiles = j.cliProfiles || [];
+                while (ssoImport.options.length > 1) ssoImport.remove(1);
+                _cliProfiles.forEach(function (p, i) { ssoImport.appendChild(el('option', { value: String(i), textContent: p.profileName + (p.ssoRoleName ? ' (' + p.ssoRoleName + ')' : '') })); });
+                ssoImport.classList.toggle('tacta-ai-set-hidden', !_cliProfiles.length);
+                var d = describeHealth(j.health); setStatus(ssoStatus, d[0], d[1]);
+                return j;
+            }).catch(function () {
+                ssoImport.classList.add('tacta-ai-set-hidden');
+                setStatus(ssoStatus, 'Helper not reachable at ' + helperBase() + '. Start it (command below), then click Check helper.', 'warn');
+            });
+        }
+        ssoImport.addEventListener('change', function () {
+            var p = _cliProfiles[parseInt(ssoImport.value, 10)];
+            if (!p) return;
+            ssoModeSso.checked = true; ssoModeProfile.checked = false;
+            fillSso(Object.assign({ mode: 'sso' }, p));
+            regionInput.value = p.region || regionInput.value;
+            ssoImport.value = '';
+        });
+        ssoSaveBtn.addEventListener('click', function () {
+            setStatus(ssoStatus, 'Saving to helper...', null);
+            helperFetch('/config', { method: 'POST', body: collectSso() }).then(function (j) {
+                var d = describeHealth(j.health); setStatus(ssoStatus, 'Saved. ' + d[0], d[1]);
+            }).catch(function (err) { setStatus(ssoStatus, 'Save failed: ' + err.message, 'err'); });
+        });
+        var _loginPoll = null;
+        ssoLoginBtn.addEventListener('click', function () {
+            setStatus(ssoStatus, 'Saving and starting the AWS sign-in...', null);
+            helperFetch('/config', { method: 'POST', body: collectSso() }).then(function () {
+                return helperFetch('/login', { method: 'POST' });
+            }).then(function (j) {
+                var l = j.login || {};
+                if (l.verificationUri) {
+                    try { chrome.tabs.create({ url: l.verificationUri }); } catch (_) { window.open(l.verificationUri, '_blank', 'noopener'); }
+                }
+                setStatus(ssoStatus, 'Approve the sign-in in the tab that just opened' + (l.userCode ? ' (code ' + l.userCode + ')' : '') + '. Waiting...', 'warn');
+                if (_loginPoll) clearInterval(_loginPoll);
+                _loginPoll = setInterval(function () {
+                    helperFetch('/login/status').then(function (s) {
+                        if (s.login.state === 'ok' || s.login.state === 'error' || s.login.state === 'idle') {
+                            clearInterval(_loginPoll); _loginPoll = null;
+                            var d = describeHealth(s.health);
+                            setStatus(ssoStatus, (s.login.state === 'error' ? s.login.message + ' ' : '') + d[0], s.login.state === 'error' ? 'err' : d[1]);
+                        }
+                    }).catch(function () { /* keep polling */ });
+                }, 2000);
+                setTimeout(function () { if (_loginPoll) { clearInterval(_loginPoll); _loginPoll = null; } }, 10 * 60 * 1000);
+            }).catch(function (err) { setStatus(ssoStatus, 'Sign-in could not start: ' + err.message, 'err'); });
+        });
+        ssoLogoutBtn.addEventListener('click', function () {
+            helperFetch('/logout', { method: 'POST' }).then(function () { return loadHelperConfig(); }).catch(function (err) { setStatus(ssoStatus, 'Sign out failed: ' + err.message, 'err'); });
+        });
+
         var helperGuide = el('div', { className: 'tacta-ai-set-helper' }, [
-            el('p', { textContent: 'Uses the AWS login already on this computer (Identity Center / SSO, or any AWS CLI profile). A tiny local helper mints a short-term Bedrock token from it when the assistant needs one; tokens expire with your AWS session (12 hours at most) and nothing long-lived is created in AWS. No secret is pasted into the browser.' }),
+            el('p', { textContent: 'Signs in to AWS with your own identity (IAM Identity Center / SSO, for example through Okta). A small helper program on this computer handles the sign-in and mints short-term Bedrock tokens for the assistant. Tokens expire with your AWS session (12 hours at most), nothing long-lived is created in AWS, and no secret is stored in the browser.' }),
             el('ol', null, [
-                el('li', null, ['If your AWS session has expired, sign in again:', cmdLine(HELPER_LOGIN_CMD)]),
-                el('li', null, ['Start the helper from the extension folder (leave the window open while you use the assistant):', cmdLine(HELPER_START_CMD)]),
-                el('li', { textContent: 'Click Save (Chrome asks to allow the extension to reach 127.0.0.1 and Bedrock), then Test.' })
+                el('li', null, ['Start the helper once (leave the window open; it installs its own dependencies the first time):', cmdLine(HELPER_START_CMD)]),
+                el('li', { textContent: 'Fill in the Identity Center details below (or import them from an AWS CLI profile), click Save to helper, then Sign in with AWS and approve the sign-in in the tab that opens.' }),
+                el('li', { textContent: 'Click Save at the bottom so Chrome lets the extension reach 127.0.0.1 and Bedrock, then Test connection.' })
             ]),
-            el('p', { className: 'tacta-ai-set-muted', textContent: 'Set AWS_PROFILE or AWS_REGION before "npm start" to use a different profile or region. The helper only answers requests from this extension.' })
-        ]);
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Helper mode']),
+                el('div', { className: 'tacta-ai-set-control', style: { flexWrap: 'wrap' } }, [
+                    el('label', { className: 'tacta-ai-set-pick' }, [ssoModeSso, el('span', { textContent: 'Sign in through the helper (Identity Center)' })]),
+                    el('label', { className: 'tacta-ai-set-pick' }, [ssoModeProfile, el('span', { textContent: 'Use an AWS CLI profile already signed in on this computer' })])
+                ])
+            ]),
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Import']),
+                el('div', { className: 'tacta-ai-set-control' }, [ssoImport])
+            ])
+        ].concat(ssoRows).concat([
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['AWS sign-in']),
+                el('div', { className: 'tacta-ai-set-control', style: { flexWrap: 'wrap' } }, [ssoSaveBtn, ssoLoginBtn, ssoLogoutBtn, ssoStatus])
+            ])
+        ]));
+        syncSsoMode();
         var helperRow = el('div', { className: 'tacta-ai-set-row' }, [
             el('div', { className: 'tacta-ai-set-label' }, ['Helper address', el('small', { textContent: 'Local only (127.0.0.1 or localhost)' })]),
             el('div', { className: 'tacta-ai-set-control' }, [helperUrlInput, helperCheckBtn, helperStatus])
@@ -312,22 +466,21 @@
             el('div', { className: 'tacta-ai-set-label' }, ['API key', el('small', { textContent: 'Bedrock API key (long-term or short-term)' })]),
             el('div', { className: 'tacta-ai-set-control' }, [keyInput, keyToggle])
         ]);
+        var _helperLoadedOnce = false;
         function syncAuthVisibility() {
             var helper = authHelper.checked;
             helperGuide.classList.toggle('tacta-ai-set-hidden', !helper);
             helperRow.classList.toggle('tacta-ai-set-hidden', !helper);
             keyRow.classList.toggle('tacta-ai-set-hidden', helper);
             refreshPermStatus();
+            if (helper && !_helperLoadedOnce) { _helperLoadedOnce = true; loadHelperConfig(); }
         }
         authHelper.addEventListener('change', syncAuthVisibility);
         authKey.addEventListener('change', syncAuthVisibility);
         helperCheckBtn.addEventListener('click', function () {
-            var base = (helperUrlInput.value.trim() || HELPER_DEFAULT_URL).replace(/\/+$/, '');
             setStatus(helperStatus, 'Checking...', null);
-            fetch(base + '/health', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
-                setStatus(helperStatus, j && j.ok ? 'Helper running (profile ' + j.profile + ', ' + j.region + ')' : 'Unexpected reply', j && j.ok ? 'ok' : 'warn');
-            }).catch(function () {
-                setStatus(helperStatus, 'Not reachable. Start it with the command above (and Save first so Chrome allows 127.0.0.1).', 'warn');
+            loadHelperConfig().then(function (j) {
+                setStatus(helperStatus, j && j.health && j.health.ok ? 'Helper running on ' + helperBase() : 'Not reachable', j && j.health && j.health.ok ? 'ok' : 'warn');
             });
         });
 

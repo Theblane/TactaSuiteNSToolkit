@@ -137,13 +137,22 @@ async function saveSettings(settings) {
 
 /**
  * Content scripts run next to the NetSuite page; they never need the raw
- * API key. Extension pages (options/popup, no sender.tab) get it in full.
+ * API key. Extension pages (options/popup/onboarding) get it in full. An
+ * options page opened as a tab DOES carry sender.tab, so trust is decided by
+ * the sender URL being one of our own chrome-extension:// pages.
  * @param {Object} settings
  * @param {Object} sender
  * @returns {Object}
  */
+function isExtensionPage(sender) {
+  if (!sender) return true;
+  if (!sender.tab) return true;
+  const url = String(sender.url || sender.origin || '');
+  return url.startsWith(chrome.runtime.getURL(''));
+}
+
 function redactForSender(settings, sender) {
-  if (!sender || !sender.tab) return settings;
+  if (isExtensionPage(sender)) return settings;
   return {
     ...settings,
     bedrock: { ...settings.bedrock, apiKey: '', hasApiKey: !!settings.bedrock.apiKey }
@@ -746,7 +755,7 @@ async function chatBedrock(settings, messages, systemPrompt, ctx) {
       system: [{ text: systemPrompt }],
       messages: convMessages,
       toolConfig,
-      inferenceConfig: { maxTokens: BEDROCK_MAX_TOKENS, temperature: 0.2 }
+      inferenceConfig: { maxTokens: BEDROCK_MAX_TOKENS }
     });
     addUsage(usage, resp.usage);
     stopReason = resp.stopReason;
@@ -860,8 +869,7 @@ async function chatNetSuite(settings, messages, systemPrompt, ctx) {
     prompt: question,
     preamble: step1Preamble,
     chatHistory: history,
-    maxTokens: NETSUITE_MAX_TOKENS,
-    temperature: 0.1
+    maxTokens: NETSUITE_MAX_TOKENS
   });
   noteUsage(step1);
   const step1Text = (step1 && step1.text) || '';
@@ -890,8 +898,7 @@ async function chatNetSuite(settings, messages, systemPrompt, ctx) {
     prompt: step2Prompt,
     preamble: step2Preamble,
     chatHistory: history,
-    maxTokens: NETSUITE_MAX_TOKENS,
-    temperature: 0.2
+    maxTokens: NETSUITE_MAX_TOKENS
   });
   noteUsage(step2);
 
@@ -949,7 +956,7 @@ export async function handleAiMessage(message, sender, deps) {
     }
 
     case 'aiSaveSettings': {
-      if (sender && sender.tab) throw new Error('AI settings can only be changed from the extension options page.');
+      if (!isExtensionPage(sender)) throw new Error('AI settings can only be changed from the extension options page.');
       const incoming = message.settings || {};
       // Allow the UI to omit the key to keep the stored one (e.g. masked display).
       if (incoming.bedrock && incoming.bedrock.apiKey === undefined) {
@@ -966,7 +973,7 @@ export async function handleAiMessage(message, sender, deps) {
       if (settings.provider === 'bedrock') {
         const resp = await bedrockConverse(settings.bedrock, {
           messages: [{ role: 'user', content: [{ text: 'Reply with the single word OK.' }] }],
-          inferenceConfig: { maxTokens: 16, temperature: 0 }
+          inferenceConfig: { maxTokens: 16 }
         });
         const txt = ((resp.output && resp.output.message && resp.output.message.content) || [])
           .map((b) => b.text || '').join('').trim();
