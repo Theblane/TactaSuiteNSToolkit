@@ -16,6 +16,11 @@
 
   const CARD_ID = 'bridgeCard';
   const LOOPBACK_ORIGIN = 'http://127.0.0.1/*';
+  // Companion is distributed with the source, not inside the installed
+  // extension (the browser cannot drop a file on disk or run Node). Users
+  // download the single zero-dependency file from the public repo.
+  const COMPANION_RAW_URL = 'https://raw.githubusercontent.com/Theblane/TactaSuiteNSToolkit/main/companion/tacta-bridge.mjs';
+  const COMPANION_VIEW_URL = 'https://github.com/Theblane/TactaSuiteNSToolkit/blob/main/companion/tacta-bridge.mjs';
 
   function send(action, extra) {
     return new Promise((resolve, reject) => {
@@ -113,9 +118,15 @@
 
       '<details class="tacta-br-setup"' + (settings.enabled && !connected ? ' open' : '') + '>' +
         '<summary>Setup: install the companion and configure Claude Desktop</summary>' +
+        '<div class="tacta-br-download">' +
+          '<a class="tacta-opt-btn tacta-opt-btn-primary" id="brDownload" href="' + esc(COMPANION_RAW_URL) + '" download="tacta-bridge.mjs" target="_blank" rel="noreferrer">Download the companion</a>' +
+          '<span class="tacta-br-hint">One zero-dependency file (<code>tacta-bridge.mjs</code>). ' +
+            'If it opens in a tab instead of downloading, use your browser\'s Save As, ' +
+            'or get it from <a href="' + esc(COMPANION_VIEW_URL) + '" target="_blank" rel="noreferrer">GitHub</a>.</span>' +
+        '</div>' +
         '<ol class="tacta-br-steps">' +
           '<li>Install <a href="https://nodejs.org" target="_blank" rel="noreferrer">Node.js</a> (18 or newer) if you do not have it.</li>' +
-          '<li>Copy <code>companion/tacta-bridge.mjs</code> from this extension to a folder on your PC.</li>' +
+          '<li>Download <code>tacta-bridge.mjs</code> (button above) and save it to a stable folder on your PC. There is nothing to install - it has no dependencies.</li>' +
           '<li>Generate a token above and click <strong>Grant local access</strong>.</li>' +
           '<li>Add the block below to your Claude Desktop config ' +
             '(<code>%APPDATA%\\Claude\\claude_desktop_config.json</code>), fixing the path to the file.</li>' +
@@ -242,6 +253,8 @@
       '.tacta-br-actions{display:flex;gap:8px;flex-wrap:wrap}',
       '.tacta-br-setup{border:1px solid var(--tacta-border,#d0d5dd);border-radius:8px;padding:10px 14px;background:var(--tacta-surface-2,#f7f9fb)}',
       '.tacta-br-setup summary{cursor:pointer;font-weight:600}',
+      '.tacta-br-download{display:flex;flex-direction:column;gap:6px;margin:12px 0;padding:12px;border:1px solid var(--tacta-border,#d0d5dd);border-radius:8px;background:var(--tacta-surface,#fff)}',
+      '.tacta-br-download a.tacta-opt-btn{align-self:flex-start;text-decoration:none;display:inline-flex;align-items:center}',
       '.tacta-br-steps{margin:10px 0;padding-left:20px;font-size:13px;line-height:1.6}',
       '.tacta-br-snippet-head{display:flex;align-items:center;justify-content:space-between;margin-top:8px}',
       '.tacta-br-snippet{margin:6px 0 0;padding:12px;border-radius:6px;background:var(--tacta-code-bg,#0f1115);color:var(--tacta-code-text,#e6e6e6);font-family:ui-monospace,Consolas,monospace;font-size:12px;overflow:auto;white-space:pre}',
