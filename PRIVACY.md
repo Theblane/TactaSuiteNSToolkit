@@ -5,7 +5,7 @@
 
 ## Summary
 
-NetSuite TactaSuite ("the extension") does not collect, transmit, or sell any user data, and never contacts any server controlled by the developer. All settings and state are stored locally on your device. The one exception to "no network calls" is the optional AI assistant: if you configure a provider yourself (Claude on Amazon Bedrock with your own API key, or NetSuite's own AI through a RESTlet you deploy into your account), your messages and the query results needed to answer them are sent to that provider when you press Send. See "AI assistant" below.
+NetSuite TactaSuite ("the extension") does not collect, transmit, or sell any user data, and never contacts any server controlled by the developer. All settings and state are stored locally on your device. The extension makes no outbound network calls of any kind, and there is no AI feature of any kind.
 
 ## What the extension stores
 
@@ -16,7 +16,6 @@ The extension stores the following information **locally** in `chrome.storage.lo
 | Feature toggle states (on/off per feature) | Remember which features you have enabled. |
 | User type preset (`user`, `admin` or `developer`) | Apply the matching default feature set. |
 | Onboarding progress and completion flag | Resume or re-run the setup walkthrough. |
-| AI assistant settings (provider choice, region, model, your API key or RESTlet ids, masking preference) | Configure the optional assistant. The key never leaves your device except as the authorization header to the provider you chose. |
 | Meeting Mode flag | Suppress visual modifications during screen shares. |
 | Panel position and size for the SuiteQL Runner | Restore window state across page loads. |
 | SuiteQL query history and saved queries | Recall recent and named queries in the SuiteQL Runner. |
@@ -36,18 +35,8 @@ The extension's content scripts run only on `*.netsuite.com` pages, and only to 
 
 This information is processed entirely inside your browser and never transmitted to any external endpoint.
 
-## AI assistant
-
-The assistant is off until you configure it. When the NetSuite AI Connector (MCP) is signed in, the model's tool calls are executed by NetSuite's own MCP server inside the account you are working in, authenticated as you with OAuth 2.0; the extension stores that account's access and refresh tokens in `chrome.storage.local` (never synced) and you can sign out from the settings page at any time. Write tools are hidden unless you enable them, and every write asks for your confirmation first. It is grounded in the NetSuite account you are signed in to and can only read: it runs SuiteQL SELECT statements, looks up the Records Catalog, and reads the record on screen. It cannot create, update or delete anything.
-
-- **What is sent:** your message, the schema metadata and query results the assistant needs, and (if you tick "Include this record") the field values of the record on screen. Emails, phone numbers, tax ids and card numbers are masked before sending unless you turn masking off.
-- **Where it goes:** only to the provider you selected. With Claude on Amazon Bedrock, to `bedrock-runtime.<region>.amazonaws.com` using either a Bedrock API key you pasted or a short-term token minted on your own computer by the optional local helper from your existing AWS login (the helper listens on 127.0.0.1 only and the extension asks for permission to reach it). With NetSuite AI, to a RESTlet inside your own NetSuite account, so the data never leaves NetSuite.
-- **When:** only when you press Send. Nothing runs in the background.
-- **Developer access:** none. The developer never sees prompts, results or keys.
-
 ## What the extension does NOT do
 
-- It does **not** contact any AI provider you have not configured yourself, and has no AI capability until you do.
 - It does **not** make any network requests to the extension developer.
 - It does **not** make any network requests to third-party analytics, telemetry, error-tracking, or advertising services.
 - It does **not** collect personally identifiable information.
@@ -56,7 +45,7 @@ The assistant is off until you configure it. When the NetSuite AI Connector (MCP
 
 ## Network access
 
-The extension's `manifest.json` requests host access for `https://*.netsuite.com/*` and `https://*.oracle.com/*`. NetSuite uses per-account subdomains (for example `1234567.app.netsuite.com`), so the wildcard is required for the extension to function. Two optional host permissions are requested at runtime and only if you use them: `https://*.amazonaws.com/*` when you choose Claude on Amazon Bedrock, and `http://127.0.0.1/*` / `http://localhost/*` when you choose to sign in with your AWS login through the local token helper. You can revoke either at any time from the extension's details page in Chrome.
+The extension's `manifest.json` requests host access for `https://*.netsuite.com/*` and `https://*.oracle.com/*`. NetSuite uses per-account subdomains (for example `1234567.app.netsuite.com`), so the wildcard is required for the extension to function. There are no optional host permissions, and the extension makes no outbound network calls to any origin; everything it does happens inside the NetSuite page in your browser.
 
 ## Permissions
 

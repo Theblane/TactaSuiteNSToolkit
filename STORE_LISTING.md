@@ -18,9 +18,9 @@ Single-purpose statements that mention "and 30+ productivity tools" or read like
 
 ## Short Description (max 132 chars)
 
-> NetSuite admin and developer toolkit: field explorer, SuiteQL runner, grounded AI assistant, screenshots with privacy masks.
+> NetSuite admin and developer toolkit: field explorer, SuiteQL runner, screenshots with privacy masks.
 
-(126 characters.)
+(101 characters.)
 
 ---
 
@@ -30,11 +30,6 @@ Single-purpose statements that mention "and 30+ productivity tools" or read like
 >
 > **Getting started**
 > A setup walkthrough opens on install. Pick Traditional User, Administrator or Developer to get a sensible default set of features, then switch any feature on or off a few at a time. Re-run it any time from the gear menu.
->
-> **AI assistant (optional, off until you configure it)**
-> • Grounded in the NetSuite account you are signed in to: it answers with read-only SuiteQL, the Records Catalog and the record on screen. It never writes.
-> • Bring your own provider: Claude on Amazon Bedrock with your API key, or NetSuite's own AI through a RESTlet you deploy (guided setup included).
-> • Nothing is sent anywhere until you choose a provider and press Send. Sensitive values are masked before they leave the browser.
 >
 > **Developer features**
 > • Field Explorer - inspect every field on a record: IDs, types, values, sublist columns, change history.
@@ -69,7 +64,7 @@ Single-purpose statements that mention "and 30+ productivity tools" or read like
 > • Portlet auto-refresh, Dataset to SuiteQL, CSV Template Generator, Search URL Builder, PDF Template Tools, CSV Import Viewer, Workflow Colors, Better Page Titles.
 >
 > **Privacy first**
-> No analytics. No data collection. No calls to the developer. All settings live in `chrome.storage.local` on your machine. The only outbound request the extension can make is the optional AI assistant call to the provider you configure yourself, and only when you press Send. See PRIVACY.md in the project source for details.
+> No analytics. No data collection. No calls to the developer. The extension makes no outbound network calls of any kind; all settings live in `chrome.storage.local` on your machine. See PRIVACY.md in the project source for details.
 >
 > **Modes**
 > A built-in "Meeting Mode" toggle suppresses every visual modification at once so the UI looks stock during screen shares.
@@ -102,18 +97,6 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 > Adds a right-click menu item ("Open in Split View") that appears only on `*.netsuite.com` pages. The menu lets users open the current page or a link in a side-by-side split pane without leaving NetSuite.
 
-### `identity`
-
-> Used only for the optional AI Assistant's connection to the NetSuite AI Connector (MCP) SuiteApp. `chrome.identity.launchWebAuthFlow` runs NetSuite's OAuth 2.0 Authorization Code sign-in (public client with PKCE) and receives the redirect at the extension's own chromiumapp.org URL. No Google account or Chrome profile identity is read. Tokens are stored locally per NetSuite account and refreshed silently; the user can sign out from the settings page.
-
-### Optional host permission: `https://*.amazonaws.com/*`
-
-> Requested at runtime, only if the user chooses "Claude on Amazon Bedrock" as the AI assistant provider and saves an API key. It allows the extension to call the Amazon Bedrock runtime endpoint (`bedrock-runtime.<region>.amazonaws.com`) with the user's own key to answer questions about the NetSuite account they are signed in to. Users who pick NetSuite's own AI, or who do not use the assistant, are never asked for it. No other AWS service is contacted.
-
-### Optional host permission: `http://127.0.0.1/*` and `http://localhost/*`
-
-> Requested at runtime only if the user chooses "My AWS login" for the Claude on Amazon Bedrock provider. The extension then fetches short-term Bedrock tokens from a small helper program the user runs on their own computer (source in `tools/bedrock-token-helper`), which mints the tokens from the user's existing AWS CLI or Identity Center session. This avoids storing any long-lived credential in the browser. No other local service is contacted and nothing is served to web pages.
-
 ### Host permission: `https://*.netsuite.com/*`
 
 > NetSuite assigns each customer account a unique subdomain - for example `1234567.app.netsuite.com`, `1234567-sb1.app.netsuite.com`, `system.netsuite.com`. Because the user's account ID is variable and unknown at install time, the extension must use a wildcard host permission to function across the user's production account, sandbox accounts, and the shared system subdomain. The extension does not declare host access for any other origin.
@@ -124,7 +107,7 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 CWS asks whether the extension uses remote code (eval, remote scripts, etc.). Answer: **No**.
 
-> All code shipped with this extension runs from local files included in the package. There is no `eval()`, no `new Function()`, no remote script loading, and no remotely hosted modules. The optional AI assistant exchanges data (prompts and query results) with the provider the user configures; it never downloads or executes code.
+> All code shipped with this extension runs from local files included in the package. There is no `eval()`, no `new Function()`, no remote script loading, and no remotely hosted modules. The extension makes no network calls and never downloads or executes code.
 
 ---
 
@@ -134,11 +117,11 @@ For each item below, check **"I do not collect this"** unless noted otherwise.
 
 | Category | Selection | Notes |
 |---|---|---|
-| Personally identifiable information | Not collected | The extension stores no PII. With the optional AI assistant, NetSuite data the user asks about is sent to the user's chosen provider at the user's request, with emails, phone numbers, tax ids and card numbers masked by default. |
+| Personally identifiable information | Not collected | The extension stores no PII. |
 | Health information | Not collected | |
 | Financial / payment information | Not collected | Extension reads NetSuite pages locally, but does not transmit. |
-| Authentication information | Not collected | No login flow. An optional AI provider API key, if the user enters one, is stored only in `chrome.storage.local` and sent only as the authorization header to that provider. |
-| Personal communications | Not collected | The optional AI assistant's chat is sent only to the provider the user configured; the developer never receives it. |
+| Authentication information | Not collected | No login flow. |
+| Personal communications | Not collected | |
 | Location | Not collected | |
 | Web history | Not collected | The extension's content scripts run only on `*.netsuite.com` - no other browsing data is read. |
 | User activity | Not collected | No clickstream or interaction logging is captured or sent. |

@@ -15,9 +15,6 @@ On first install a setup walkthrough opens. It asks whether you are a Traditiona
 
 ## Features
 
-### AI
-- **AI Assistant** (optional, off until configured) - ask questions about the NetSuite account you are signed in to. With the **NetSuite AI Connector (MCP)** signed in, Claude's tool calls run through NetSuite's own MCP server for that account, as you: SuiteQL, record get, saved searches, reports, and (only if you enable writes, each one confirmed) record create and update. Without it, the assistant falls back to the extension's read-only tools: SuiteQL SELECT queries, the Records Catalog and the record on screen. Choose **Claude on Amazon Bedrock** (sign in with the AWS login already on your machine through the small local helper in `tools/bedrock-token-helper`, or paste a Bedrock API key; optional host permissions requested on save) or **NetSuite's own AI** through an N/llm RESTlet you deploy; the settings page shows the RESTlet code and a step-by-step install guide. Sensitive values (emails, phones, tax ids, card numbers) are masked before anything leaves the browser.
-
 ### Developer
 - **Field Explorer** - inspect every field on the current record: IDs, types, values, sublist columns.
 - **Script Analyzer** - analyze deployed scripts on the current record (entry points, usage, governance).
@@ -87,10 +84,10 @@ Source: [github.com/Theblane/TactaSuiteNSToolkit](https://github.com/Theblane/Ta
 
 The gear icon in the popup (and the setup walkthrough) lets you pick who you are. Each feature in the registry declares an `audience`, and the preset is derived from it so the popup, the settings page and the walkthrough always agree:
 - **Traditional User** - productivity tools only (Field Finder, Quick Search, Transaction Tree, Audit Trail, Environment Badge, Screenshot Studio, etc.).
-- **Administrator** - user tools plus Field Explorer, SuiteQL Runner, Field Help, PDF and CSV tools, Workflow Colors, AI Assistant.
+- **Administrator** - user tools plus Field Explorer, SuiteQL Runner, Field Help, PDF and CSV tools, Workflow Colors.
 - **Developer** - everything except the opt-in extras (Split View, Portlet Refresher, Instant UI).
 
-The gear panel also holds the theme (Light is the default), accent color and the link to the AI Assistant settings.
+The gear panel also holds the theme (Light is the default) and accent color.
 
 ## Permissions
 
@@ -104,13 +101,10 @@ The extension requests only what it needs to operate inside NetSuite:
 | `declarativeContent` | Show the extension action icon only on `*.netsuite.com` pages. |
 | `contextMenus` | Right-click menu entries (e.g., Split View). |
 | Host: `https://*.netsuite.com/*`, `https://*.oracle.com/*` | NetSuite uses per-account subdomains (`<accountid>.app.netsuite.com`), so wildcard host access is required. |
-| Optional host: `https://*.amazonaws.com/*` | Requested at runtime only if you choose Claude on Amazon Bedrock for the AI Assistant. Revocable from the extension details page. |
-| `identity` | Runs the OAuth 2.0 sign-in to the NetSuite AI Connector (MCP) in a browser window and receives the redirect at the extension's chromiumapp.org URL. Tokens are stored in `chrome.storage.local` per account and refreshed silently. |
-| Optional host: `http://127.0.0.1/*`, `http://localhost/*` | Requested only if you pick "My AWS login" for Bedrock: the extension fetches short-term Bedrock tokens from the local helper in `tools/bedrock-token-helper`, which mints them from your AWS CLI / Identity Center session. Nothing else on localhost is contacted. |
 
 ## Privacy
 
-This extension does not collect, transmit, or store any user data on remote servers, and never contacts the developer. All settings are stored locally in `chrome.storage.local`. The only outbound request it can make is the optional AI Assistant call to the provider you configure yourself, and only when you press Send. See [PRIVACY.md](./PRIVACY.md).
+This extension does not collect, transmit, or store any user data on remote servers, and never contacts the developer. It makes no outbound network calls of any kind; all settings and state are stored locally in `chrome.storage.local`. See [PRIVACY.md](./PRIVACY.md).
 
 ## Architecture
 
@@ -129,10 +123,10 @@ TactaSuiteNSToolkit/
 │   ├── feature-loader.js          URL-pattern feature loader
 │   └── features/                  One folder per feature
 ├── popup/                         Extension action popup (gear panel for settings)
-├── options/                       Full-page settings (AI Assistant section included)
+├── options/                       Full-page settings
 ├── onboarding/                    Setup walkthrough shown on first install
-├── shared/                        Cross-feature utilities, theme, AI settings UI
-├── docs/                          Competitive review, roadmap, RESTlet source for NetSuite AI
+├── shared/                        Cross-feature utilities, theme
+├── docs/                          Competitive review, roadmap
 ├── tests/                         Playwright page-world tests
 └── icons/
 ```
