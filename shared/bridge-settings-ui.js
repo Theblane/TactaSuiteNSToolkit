@@ -18,8 +18,10 @@
   const LOOPBACK_ORIGIN = 'http://127.0.0.1/*';
   // Companion is distributed with the source, not inside the installed
   // extension (the browser cannot drop a file on disk or run Node). Users
-  // download the single zero-dependency file from the public repo.
-  const COMPANION_RAW_URL = 'https://raw.githubusercontent.com/Theblane/TactaSuiteNSToolkit/main/companion/tacta-bridge.mjs';
+  // download the single zero-dependency file from the public repo. The
+  // releases/latest/download URL serves the asset with an attachment header,
+  // so it downloads directly rather than opening in a browser tab.
+  const COMPANION_DL_URL = 'https://github.com/Theblane/TactaSuiteNSToolkit/releases/latest/download/tacta-bridge.mjs';
   const COMPANION_VIEW_URL = 'https://github.com/Theblane/TactaSuiteNSToolkit/blob/main/companion/tacta-bridge.mjs';
 
   function send(action, extra) {
@@ -119,10 +121,9 @@
       '<details class="tacta-br-setup"' + (settings.enabled && !connected ? ' open' : '') + '>' +
         '<summary>Setup: install the companion and configure Claude Desktop</summary>' +
         '<div class="tacta-br-download">' +
-          '<a class="tacta-opt-btn tacta-opt-btn-primary" id="brDownload" href="' + esc(COMPANION_RAW_URL) + '" download="tacta-bridge.mjs" target="_blank" rel="noreferrer">Download the companion</a>' +
-          '<span class="tacta-br-hint">One zero-dependency file (<code>tacta-bridge.mjs</code>). ' +
-            'If it opens in a tab instead of downloading, use your browser\'s Save As, ' +
-            'or get it from <a href="' + esc(COMPANION_VIEW_URL) + '" target="_blank" rel="noreferrer">GitHub</a>.</span>' +
+          '<a class="tacta-opt-btn tacta-opt-btn-primary" id="brDownload" href="' + esc(COMPANION_DL_URL) + '" download="tacta-bridge.mjs" target="_blank" rel="noreferrer">Download the companion</a>' +
+          '<span class="tacta-br-hint">One zero-dependency file (<code>tacta-bridge.mjs</code>) from the latest release. ' +
+            'You can also <a href="' + esc(COMPANION_VIEW_URL) + '" target="_blank" rel="noreferrer">view the source on GitHub</a>.</span>' +
         '</div>' +
         '<ol class="tacta-br-steps">' +
           '<li>Install <a href="https://nodejs.org" target="_blank" rel="noreferrer">Node.js</a> (18 or newer) if you do not have it.</li>' +

@@ -29,8 +29,11 @@ Manifest V3 service worker alive.
 ## Install
 
 1. Install [Node.js](https://nodejs.org) 18 or newer.
-2. Copy `tacta-bridge.mjs` somewhere stable on your PC (there is nothing to
-   `npm install` - it has no dependencies).
+2. Download `tacta-bridge.mjs` and save it somewhere stable on your PC (there is
+   nothing to `npm install` - it has no dependencies). Get it from the
+   [latest release](https://github.com/Theblane/TactaSuiteNSToolkit/releases/latest/download/tacta-bridge.mjs),
+   or use the **Download the companion** button in the extension's bridge
+   settings card.
 3. In the extension, open **Options -> Claude Desktop bridge**:
    - Click **Generate** to create a pairing token.
    - Click **Grant local access** (approves the `127.0.0.1` connection).
