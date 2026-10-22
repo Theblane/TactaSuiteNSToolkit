@@ -5,7 +5,7 @@
   "description": "Unified NetSuite developer toolkit - field explorer, search export, script analysis, and 30+ productivity tools.",
   "author": "Blane Maher",
   "homepage_url": "https://github.com/Theblane/TactaSuiteNSToolkit",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAokkBDQa7zq8K/CrzHBBSsmm0rUFmBfNA8InB4VXDUc/MnfS3Izqcun37QB8fdXb9ustkYqKE1m9mMUTmCDX3dz8Yg6tuBAk3kzDdDU/YDbnbL9oMp4PxomPwa0QuQoB4UhREVUUsPqgQafR6tjELXhSynP08WRt0lz0MABc97ZJvJdJgL7DseJQk2f26c2zCymhbn39SDFtBShD+nZCR7JrPAnpH1f/8TxZhB0P2mEvcU3fKmdKRaTIyYBV+4/1iJJL50cBj4grffU9B9MqhgakIb17yxaC5qQVtxt2YlZzvxwQ25mlZONmJHE1ejN7V659pEgzZDbHENy/G5Mod0wIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8fmyGBIXC1bnvN2jhHA5wTDRKwXNPCvR+6rJJ6vZ1wlLyKsu4T6fToD65IbScRJIl5+cYorCkjkd8h9CVyNWToyzDmpfXKjZphFAwbadw5Cu6P22+/qfgNaFKZ5e4JVhZ1r3e5LcDnswAZy9gnt5qNP9JZFvlVKSjRMIuGD6VTL4E6bdw/a5R2opr/hKDGpJydFTXBS0QKgbd0oKfKThzXYGE2pM6a+Sh65sSpTwkX5Y3lVIsuaXYg2MBT/w+oCn/RP54u/pO1lsi9cV2l4vqaBFGGC/ydcRJRu7dwwY2GV/Obka2mdYcgT2PqgWI/Mq19Svfq1fF3cqevsM8z4JsQIDAQAB",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
