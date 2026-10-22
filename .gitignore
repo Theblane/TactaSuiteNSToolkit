@@ -14,3 +14,6 @@ test-results/
 
 .env
 .env.*
+
+# Extension signing keys - NEVER commit
+*.pem
