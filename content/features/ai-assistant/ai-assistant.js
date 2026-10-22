@@ -294,6 +294,49 @@
         ]);
     }
 
+    // NetSuite AI Connector (MCP) status chip, filled asynchronously.
+    function buildMcpChip() {
+        var chip = el('span', { className: SC + '-chip ' + SC + '-chip-muted', textContent: 'NetSuite AI Connector: checking...' });
+        if (!_settings || _settings.provider !== 'bedrock') { chip.textContent = 'NetSuite AI Connector: Bedrock provider only'; return chip; }
+        sendMessage({ action: 'mcpStatus' }).then(function (s) {
+            if (!s || !s.account) { chip.textContent = 'NetSuite AI Connector: not a NetSuite account tab'; return; }
+            if (!s.configured) { chip.textContent = 'NetSuite AI Connector: not set up for ' + s.label + ' (local SuiteQL tools in use)'; return; }
+            if (!s.signedIn) { chip.textContent = 'NetSuite AI Connector: sign in needed for ' + s.label; chip.classList.add(SC + '-chip-warn'); return; }
+            if (s.error) { chip.textContent = 'NetSuite AI Connector: ' + s.error; chip.classList.add(SC + '-chip-warn'); return; }
+            chip.classList.remove(SC + '-chip-muted');
+            chip.textContent = 'NetSuite AI Connector: ' + s.label + ', ' + (s.tools ? s.tools.length : 0) + ' tools' + (s.allowWrites ? ' (writes on, confirmed)' : ' (read-only)');
+        }).catch(function (err) { chip.textContent = 'NetSuite AI Connector: ' + err.message; });
+        return chip;
+    }
+
+    // The service worker asks before running an MCP write tool.
+    chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
+        if (!message || message.action !== 'aiConfirmWrite') return false;
+        try {
+            var pretty = JSON.stringify(message.input || {}, null, 2);
+            var content = el('div', { className: SC + '-confirm' }, [
+                el('p', { textContent: 'The assistant wants to run a NetSuite tool that changes data:' }),
+                el('div', { className: SC + '-confirm-tool', textContent: message.tool }),
+                el('pre', { className: SC + '-confirm-input', textContent: pretty.length > 4000 ? pretty.slice(0, 4000) + '\n...' : pretty }),
+                el('p', { className: SC + '-confirm-note', textContent: 'This runs in the NetSuite account you are logged in to, as you. Allow only if this is exactly what you asked for.' })
+            ]);
+            var done = false;
+            var modal = window.TactaDOM.createModal({
+                title: 'Confirm NetSuite change',
+                content: content,
+                closeOnOverlay: false,
+                buttons: [
+                    { label: 'Cancel', onClick: function () { if (!done) { done = true; sendResponse({ approved: false }); } modal.close(); } },
+                    { label: 'Allow this change', className: 'tacta-btn-primary', onClick: function () { if (!done) { done = true; sendResponse({ approved: true }); } modal.close(); } }
+                ],
+                onClose: function () { if (!done) { done = true; sendResponse({ approved: false }); } }
+            });
+        } catch (e) {
+            sendResponse({ approved: false });
+        }
+        return true;
+    });
+
     function buildHeaderBar() {
         var isRecord = _pageInfo && RECORD_PAGE_TYPES[_pageInfo.pageType] && (_pageInfo.recordType || _pageInfo.recordId);
         var chipText = isRecord
@@ -311,6 +354,7 @@
                 el('button', { className: 'tacta-btn tacta-btn-sm ' + SC + '-settings-btn', textContent: 'Settings', title: 'Open AI settings', events: { click: openSettings } })
             ]),
             el('div', { className: SC + '-context' }, [
+                buildMcpChip(),
                 el('span', { className: SC + '-chip' + (isRecord ? '' : ' ' + SC + '-chip-muted'), textContent: chipText }),
                 el('label', { className: SC + '-include' + (isRecord ? '' : ' ' + SC + '-include-disabled') }, [
                     _ui.includeRecord,
@@ -366,7 +410,7 @@
         if (_messages.length) {
             _messages.forEach(function (m) { addBubble(m.role, m.text); });
         } else {
-            _ui.transcript.appendChild(el('div', { className: SC + '-welcome', textContent: 'Ask a question about this account. The assistant reads live data through SuiteQL and the Records Catalog and shows every step in the work log.' }));
+            _ui.transcript.appendChild(el('div', { className: SC + '-welcome', textContent: 'Ask a question about this account. With the NetSuite AI Connector signed in, the assistant uses NetSuite\'s own MCP tools (SuiteQL, records, saved searches, reports) inside this account; otherwise it falls back to read-only SuiteQL and the Records Catalog. Every step shows in the work log.' }));
         }
 
         shell.appendChild(buildComposer());

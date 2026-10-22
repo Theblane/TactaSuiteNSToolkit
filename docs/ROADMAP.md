@@ -25,6 +25,8 @@ A feature counts as landed only when it has a registry entry, a test, and a line
 | Onboarding walkthrough + user types | own | `onboarding/` page opened on install; registry `audience` seeds toggles per type | M | none | - | all |
 | Popup gear settings | own | inline panel: user type, theme, click-outside, links to walkthrough / AI settings / options | S | none | - | all |
 | Light-mode default | own | `theme-manager.js` default flip, `:root` defaults in CSS | S | none | Existing users who never saved a theme switch to light | all |
+| AI Assistant: NetSuite AI Connector (MCP) client | own | OAuth 2.0 PKCE via chrome.identity to the account's MCP SuiteApp; tools listed dynamically, writes behind a toggle with per-call confirmation; local read-only tools as fallback | L | identity | SHIPPED 2026-10-22; needs an integration record per account | A, D |
+| AI Assistant: sign in with the user's AWS login | own | local helper runs the Identity Center device flow, mints short-term Bedrock tokens; TODO refresh-token renewal, packaged exe | M | optional 127.0.0.1 | SHIPPED 2026-10-22 | A, D |
 | AI Assistant (Bedrock + N/llm) | Full Tools (pattern), own tools | Bedrock Converse via fetch with bearer key; N/llm via RESTlet the user deploys from shipped source; tools: SuiteQL SELECT-only, rcendpoint, current record | L | optional host `https://*.amazonaws.com/*` | Listing rewrite required; key handling; cost | A, D |
 | Environment badge | TDT, SuiteAdvanced | hostname regex, pill + `[SBn]` title prefix | S | none | - | all |
 | Transaction Trail chips | TDT | SuiteQL on nexttransactionlinelink, breadcrumb at page top | S | none | - | all |

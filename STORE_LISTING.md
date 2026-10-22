@@ -102,6 +102,10 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 > Adds a right-click menu item ("Open in Split View") that appears only on `*.netsuite.com` pages. The menu lets users open the current page or a link in a side-by-side split pane without leaving NetSuite.
 
+### `identity`
+
+> Used only for the optional AI Assistant's connection to the NetSuite AI Connector (MCP) SuiteApp. `chrome.identity.launchWebAuthFlow` runs NetSuite's OAuth 2.0 Authorization Code sign-in (public client with PKCE) and receives the redirect at the extension's own chromiumapp.org URL. No Google account or Chrome profile identity is read. Tokens are stored locally per NetSuite account and refreshed silently; the user can sign out from the settings page.
+
 ### Optional host permission: `https://*.amazonaws.com/*`
 
 > Requested at runtime, only if the user chooses "Claude on Amazon Bedrock" as the AI assistant provider and saves an API key. It allows the extension to call the Amazon Bedrock runtime endpoint (`bedrock-runtime.<region>.amazonaws.com`) with the user's own key to answer questions about the NetSuite account they are signed in to. Users who pick NetSuite's own AI, or who do not use the assistant, are never asked for it. No other AWS service is contacted.

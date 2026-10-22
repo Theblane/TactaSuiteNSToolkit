@@ -427,3 +427,10 @@
     line-height: 1.4;
     color: var(--tacta-text-muted);
 }
+
+/* NetSuite AI Connector chip + write confirmation */
+.tacta-ai-chip-warn { border-color: var(--tacta-warning, #f39c12); color: var(--tacta-warning, #f39c12); }
+.tacta-ai-confirm p { margin: 0 0 8px; }
+.tacta-ai-confirm-tool { font-family: var(--tacta-font-mono); font-weight: 600; margin-bottom: 6px; }
+.tacta-ai-confirm-input { max-height: 240px; overflow: auto; padding: 8px; font-size: 12px; background: var(--tacta-bg); border: 1px solid var(--tacta-border); border-radius: var(--tacta-radius-sm); }
+.tacta-ai-confirm-note { color: var(--tacta-text-muted); font-size: 12px; }

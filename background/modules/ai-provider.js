@@ -33,6 +33,8 @@
 // Constants
 // ---------------------------------------------------------------------------
 
+import { mcpToolsetForTab } from './netsuite-mcp.js';
+
 export const AI_STORAGE_KEY = 'tacta_ai_settings';
 
 export const AI_DEFAULT_SETTINGS = {
@@ -499,6 +501,17 @@ async function toolGetCurrentRecord(input, ctx) {
  * Dispatches a tool call by name. Never throws; errors become results.
  * @returns {Promise<{ outcome: string, forModel: Object, isError: boolean, rows?: Array }>}
  */
+async function executeMcpTool(name, input, ctx) {
+  try {
+    const r = await ctx.mcp.call(name, input || {});
+    if (ctx.mask && r.forModel) r.forModel = maskDeep(r.forModel);
+    if (ctx.mask && r.rows) r.rows = maskDeep(r.rows);
+    return r;
+  } catch (e) {
+    return { outcome: 'error: ' + e.message, forModel: { error: e.message }, isError: true };
+  }
+}
+
 async function executeTool(name, input, ctx) {
   try {
     if (name === 'run_suiteql') return await toolRunSuiteQL(input || {}, ctx);
@@ -551,13 +564,22 @@ function buildSystemPrompt(opts) {
   parts.push('You are the NetSuite TactaSuite AI Assistant, a NetSuite data analyst working inside the NetSuite account the user is currently logged in to. ' +
     'Everything you say must be grounded in data read from THIS account through the tools provided; you are not a general chatbot.');
   parts.push('Rules:');
-  parts.push('1. You are strictly READ-ONLY. Never attempt to create, update or delete anything. If asked to change data, explain how the user could do it in the NetSuite UI instead.');
+  parts.push(opts.mcp && opts.mcp.configured && opts.mcp.allowWrites
+    ? '1. Treat data changes as exceptional: only when the user asks for one explicitly, after describing it, and through the confirmed write tools.'
+    : '1. You are strictly READ-ONLY. Never attempt to create, update or delete anything. If asked to change data, explain how the user could do it in the NetSuite UI instead.');
   parts.push('2. Prefer running SuiteQL over assumptions. When you are unsure about a table or column name, verify it with record_catalog before guessing.');
   parts.push('3. Cite row counts and the record ids you looked at. Say clearly when a result set was truncated or empty.');
   parts.push('4. Answer in the same language the user writes in. Be concise and left-aligned plain text; use short bullet lists and simple tables when they help.');
   parts.push('5. Some values may appear as [masked]; this is deliberate privacy masking by the extension. Do not try to reconstruct them.');
   parts.push('6. Do not invent field values. If the data is not available, say so and suggest the query or page that would show it.');
-  if (opts.nativeTools) {
+  if (opts.mcp && opts.mcp.configured) {
+    const names = opts.mcp.tools.map((t) => t.name);
+    parts.push('Tools: you are connected to the NetSuite AI Connector (MCP) for account ' + opts.mcp.acct.label + '. Its tools run inside that account as the user: ' + names.join(', ') + '. ' +
+      'Also available: get_current_record (what the user has on screen). Prefer ns_getSuiteQLMetadata (or the catalog tool) to verify tables and columns before writing SuiteQL. Call tools as needed, then give the final answer in plain text.');
+    if (opts.mcp.allowWrites) {
+      parts.push('Write tools are enabled, but every create/update/delete is shown to the user for confirmation before it runs. Only use them when the user explicitly asks to change data, state exactly what will change first, and never retry a declined write.');
+    }
+  } else if (opts.nativeTools) {
     parts.push('Tools: run_suiteql (read-only SELECT, max 500 rows), record_catalog (types / detail), get_current_record. Call tools as needed, then give the final answer in plain text.');
   }
   parts.push(SCHEMA_HINTS);
@@ -742,9 +764,12 @@ async function chatBedrock(settings, messages, systemPrompt, ctx) {
   if (!convMessages.length || convMessages[convMessages.length - 1].role !== 'user') {
     throw new Error('The last message must come from the user.');
   }
-  const toolConfig = {
-    tools: TOOL_SPECS.map((t) => ({ toolSpec: { name: t.name, description: t.description, inputSchema: { json: t.inputSchema } } }))
-  };
+  // With the NetSuite AI Connector connected, its tools replace the local
+  // SuiteQL / catalog tools; get_current_record stays (the page is local).
+  const localSpecs = TOOL_SPECS
+    .filter((t) => !(ctx.mcp && ctx.mcp.configured) || t.name === 'get_current_record')
+    .map((t) => ({ toolSpec: { name: t.name, description: t.description, inputSchema: { json: t.inputSchema } } }));
+  const toolConfig = { tools: localSpecs.concat(ctx.mcp && ctx.mcp.configured ? ctx.mcp.specs : []) };
   const steps = [];
   const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, requests: 0 };
   let finalText = '';
@@ -774,7 +799,9 @@ async function chatBedrock(settings, messages, systemPrompt, ctx) {
       }
       const results = [];
       for (const tu of toolUses) {
-        const r = await executeTool(tu.name, tu.input, ctx);
+        const r = (ctx.mcp && ctx.mcp.configured && ctx.mcp.has(tu.name))
+          ? await executeMcpTool(tu.name, tu.input, ctx)
+          : await executeTool(tu.name, tu.input, ctx);
         const stepRec = { tool: tu.name, input: summarizeInput(tu.input), outcome: r.outcome };
         if (r.rows) { stepRec.rows = r.rows; stepRec.columns = r.columns; stepRec.totalRows = r.totalRows; }
         steps.push(stepRec);
@@ -1010,9 +1037,30 @@ export async function handleAiMessage(message, sender, deps) {
       if (!deps || typeof deps.executeSuiteQL !== 'function' || typeof deps.runInPage !== 'function') {
         throw new Error('AI provider dependencies are not wired in the service worker.');
       }
-      const ctx = { tabId, deps, mask: settings.maskSensitive !== false };
+      const ctx = { tabId, deps, mask: settings.maskSensitive !== false, mcp: null };
       const messages = Array.isArray(message.messages) ? message.messages : [];
       if (!messages.length) throw new Error('No messages to send.');
+
+      // NetSuite AI Connector (MCP): the account comes from the tab. If it is
+      // configured but the user is not signed in, say so instead of silently
+      // falling back to the local tools.
+      if (settings.provider === 'bedrock') {
+        const confirmWrite = (toolName, input) => new Promise((resolve) => {
+          try {
+            chrome.tabs.sendMessage(tabId, { action: 'aiConfirmWrite', tool: toolName, input }, (resp) => {
+              if (chrome.runtime.lastError) { resolve(false); return; }
+              resolve(!!(resp && resp.approved));
+            });
+          } catch (_) { resolve(false); }
+        });
+        try {
+          ctx.mcp = await mcpToolsetForTab(tabId, confirmWrite);
+        } catch (e) {
+          if (e.needsLogin) throw e;
+          ctx.mcp = null;
+          ctx.mcpError = e.message;
+        }
+      }
 
       let record = null;
       if (message.includeRecordContext) {
@@ -1023,7 +1071,7 @@ export async function handleAiMessage(message, sender, deps) {
           record = { pageType: null, recordType: null, recordId: null, fields: [], fieldError: e.message };
         }
       }
-      const systemPrompt = buildSystemPrompt({ record, nativeTools: settings.provider === 'bedrock' });
+      const systemPrompt = buildSystemPrompt({ record, nativeTools: settings.provider === 'bedrock', mcp: ctx.mcp });
 
       const result = settings.provider === 'bedrock'
         ? await chatBedrock(settings, messages, systemPrompt, ctx)
@@ -1036,7 +1084,8 @@ export async function handleAiMessage(message, sender, deps) {
         provider: settings.provider,
         model: settings.provider === 'bedrock' ? settings.bedrock.modelId : (result.usage && result.usage.model) || 'NetSuite AI (N/llm)',
         masked: ctx.mask,
-        recordContextIncluded: !!record
+        recordContextIncluded: !!record,
+        mcp: ctx.mcp && ctx.mcp.configured ? { account: ctx.mcp.acct.label, tools: ctx.mcp.tools.length, server: ctx.mcp.serverInfo && ctx.mcp.serverInfo.name } : (ctx.mcpError ? { error: ctx.mcpError } : null)
       };
     }
 

@@ -24,7 +24,8 @@
     "activeTab",
     "scripting",
     "declarativeContent",
-    "contextMenus"
+    "contextMenus",
+    "identity"
   ],
   "host_permissions": [
     "https://*.netsuite.com/*",

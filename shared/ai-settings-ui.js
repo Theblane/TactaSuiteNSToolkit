@@ -90,6 +90,11 @@
         '.tacta-ai-set-muted { color: var(--tacta-text-muted, #666); }',
         '.tacta-ai-set-pick { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; cursor: pointer; }',
         '.tacta-ai-set-row-sso .tacta-ai-set-input { max-width: 420px; }',
+        '.tacta-ai-set-tools { margin: 6px 0 10px; max-height: 260px; overflow: auto; border: 1px solid var(--tacta-border, #ccc); border-radius: var(--tacta-radius-md, 6px); background: var(--tacta-bg, #f7f8fa); }',
+        '.tacta-ai-set-tool { display: flex; gap: 8px; align-items: baseline; padding: 5px 10px; border-bottom: 1px solid var(--tacta-border, #e5e5e5); font-size: 12px; } .tacta-ai-set-tool:last-child { border-bottom: none; }',
+        '.tacta-ai-set-tool code { font-family: var(--tacta-font-mono, monospace); white-space: nowrap; } .tacta-ai-set-tool-desc { color: var(--tacta-text-muted, #666); }',
+        '.tacta-ai-set-tool-badge { font-size: 10px; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: var(--tacta-accent-muted, #e8f5e0); color: var(--tacta-text, #222); } .tacta-ai-set-tool-write .tacta-ai-set-tool-badge { background: var(--tacta-warning-bg, #fdf1dc); color: var(--tacta-warning, #b36b00); }',
+        '.tacta-ai-set-inline-code { font-family: var(--tacta-font-mono, monospace); font-size: 12px; padding: 3px 8px; background: var(--tacta-bg-elevated, #fff); border: 1px solid var(--tacta-border, #ccc); border-radius: 4px; word-break: break-all; }',
         '.tacta-ai-set-hidden { display: none !important; }',
         '.tacta-ai-set-guide details { border: 1px solid var(--tacta-border); border-radius: var(--tacta-radius-md); margin-top: var(--tacta-space-md); background: var(--tacta-bg-elevated); }',
         '.tacta-ai-set-guide summary { cursor: pointer; padding: var(--tacta-space-sm) var(--tacta-space-md); font-weight: 600; font-size: var(--tacta-font-size-sm); color: var(--tacta-text-secondary); }',
@@ -527,6 +532,140 @@
         ]);
         root.appendChild(bedrockCard);
 
+        // ── NetSuite AI Connector (MCP) card ──
+        var mcpAccount = el('span', { className: 'tacta-ai-set-status', textContent: 'Detecting the NetSuite account from your open tab...' });
+        var mcpClientId = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: 'Client ID from the integration record', spellcheck: 'false', autocomplete: 'off' });
+        var mcpRedirect = el('code', { className: 'tacta-ai-set-inline-code', textContent: '...' });
+        var mcpRedirectCopy = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Copy' });
+        var mcpSignInBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-primary tacta-ai-set-btn-sm', type: 'button', textContent: 'Sign in to NetSuite' });
+        var mcpSignOutBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Sign out' });
+        var mcpRefreshBtn = el('button', { className: 'tacta-ai-set-btn tacta-ai-set-btn-sm', type: 'button', textContent: 'Refresh tools' });
+        var mcpStatus = el('span', { className: 'tacta-ai-set-status' });
+        var mcpToolList = el('div', { className: 'tacta-ai-set-tools tacta-ai-set-hidden' });
+        var mcpWrites = el('input', { type: 'checkbox' });
+        var mcpWritesToggle = el('label', { className: 'tacta-ai-set-toggle' }, [mcpWrites, el('span', { className: 'tacta-ai-set-toggle-track' })]);
+        var mcpWritesStatus = el('span', { className: 'tacta-ai-set-status', textContent: 'Off (read-only tools only)' });
+        var _mcpState = null;
+
+        function mcpTabId() { return findNetSuiteTabId(); }
+        function mcpSend(action, extra) {
+            return mcpTabId().then(function (tabId) {
+                return sendMessage(Object.assign({ action: action }, tabId ? { tabId: tabId } : {}, extra || {}));
+            });
+        }
+        function renderMcpTools(tools) {
+            mcpToolList.innerHTML = '';
+            if (!tools || !tools.length) { mcpToolList.classList.add('tacta-ai-set-hidden'); return; }
+            mcpToolList.classList.remove('tacta-ai-set-hidden');
+            tools.forEach(function (t) {
+                mcpToolList.appendChild(el('div', { className: 'tacta-ai-set-tool' + (t.write ? ' tacta-ai-set-tool-write' : '') }, [
+                    el('code', { textContent: t.name }),
+                    el('span', { className: 'tacta-ai-set-tool-badge', textContent: t.write ? 'write' : 'read' }),
+                    el('span', { className: 'tacta-ai-set-tool-desc', textContent: t.description || '' })
+                ]));
+            });
+        }
+        function renderMcp(s) {
+            _mcpState = s;
+            mcpRedirect.textContent = s.redirectUri || '';
+            if (!s.account) {
+                setStatus(mcpAccount, 'Open a NetSuite tab (the account is read from its address) and click Refresh tools.', 'warn');
+                setStatus(mcpStatus, '', null);
+                renderMcpTools(null);
+                return;
+            }
+            setStatus(mcpAccount, 'Account ' + s.label + ' (' + s.account + ')', 'ok');
+            if (document.activeElement !== mcpClientId) mcpClientId.value = s.clientId || '';
+            mcpWrites.checked = !!s.allowWrites;
+            mcpWritesStatus.textContent = mcpWrites.checked ? 'On (each write asks for confirmation in the chat)' : 'Off (read-only tools only)';
+            if (!s.configured) { setStatus(mcpStatus, 'Enter the Client ID for this account, then Sign in to NetSuite.', 'warn'); renderMcpTools(null); return; }
+            if (!s.signedIn) { setStatus(mcpStatus, 'Not signed in. Click Sign in to NetSuite and pick your MCP role.', 'warn'); renderMcpTools(null); return; }
+            if (s.error) { setStatus(mcpStatus, 'Signed in, but the MCP server answered: ' + s.error, 'err'); renderMcpTools(null); return; }
+            var n = s.tools ? s.tools.length : 0;
+            var writes = s.tools ? s.tools.filter(function (t) { return t.write; }).length : 0;
+            setStatus(mcpStatus, 'Connected to ' + ((s.serverInfo && s.serverInfo.name) || 'NetSuite MCP') + ': ' + n + ' tools (' + (n - writes) + ' read, ' + writes + ' write' + (s.allowWrites ? '' : ', hidden') + ').', 'ok');
+            renderMcpTools(s.tools);
+        }
+        function loadMcp() {
+            setStatus(mcpStatus, 'Checking...', null);
+            return mcpSend('mcpStatus').then(renderMcp).catch(function (err) { setStatus(mcpStatus, err.message, 'err'); });
+        }
+        mcpRedirectCopy.addEventListener('click', function () {
+            copyText(mcpRedirect.textContent).then(function (ok) { mcpRedirectCopy.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(function () { mcpRedirectCopy.textContent = 'Copy'; }, 1800); });
+        });
+        mcpSignInBtn.addEventListener('click', function () {
+            var cid = mcpClientId.value.trim();
+            if (!cid) { setStatus(mcpStatus, 'Enter the integration record Client ID first.', 'warn'); return; }
+            setStatus(mcpStatus, 'Opening the NetSuite sign-in... pick your MCP role when asked.', null);
+            mcpSend('mcpSignIn', { clientId: cid }).then(renderMcp).catch(function (err) { setStatus(mcpStatus, 'Sign-in failed: ' + err.message, 'err'); });
+        });
+        mcpSignOutBtn.addEventListener('click', function () {
+            mcpSend('mcpSignOut').then(renderMcp).catch(function (err) { setStatus(mcpStatus, err.message, 'err'); });
+        });
+        mcpRefreshBtn.addEventListener('click', function () {
+            setStatus(mcpStatus, 'Refreshing...', null);
+            mcpSend('mcpRefreshTools').then(renderMcp).catch(function (err) { setStatus(mcpStatus, err.message, 'err'); loadMcp(); });
+        });
+        mcpClientId.addEventListener('change', function () {
+            if (!_mcpState || !_mcpState.account) return;
+            var accounts = {}; accounts[_mcpState.account] = { clientId: mcpClientId.value.trim() };
+            sendMessage({ action: 'mcpSaveSettings', settings: { accounts: accounts } }).then(loadMcp).catch(function (err) { setStatus(mcpStatus, err.message, 'err'); });
+        });
+        mcpWrites.addEventListener('change', function () {
+            sendMessage({ action: 'mcpSaveSettings', settings: { allowWrites: mcpWrites.checked } }).then(loadMcp).catch(function (err) { setStatus(mcpStatus, err.message, 'err'); });
+        });
+
+        var mcpGuide = el('div', { className: 'tacta-ai-set-guide' }, [
+            el('details', null, [
+                el('summary', { textContent: 'One-time setup: create the integration record (about 3 minutes, Administrator role)' }),
+                el('div', { className: 'tacta-ai-set-guide-body' }, [
+                    el('ol', { className: 'tacta-ai-set-steps' }, [
+                        el('li', null, ['In this NetSuite account go to ', el('strong', { textContent: 'Setup > Integration > Manage Integrations > New' }), '.']),
+                        el('li', null, ['Name it, for example ', el('code', { textContent: 'NetSuite TactaSuite (MCP)' }), ', State Enabled.']),
+                        el('li', null, ['Under OAuth 2.0 check ', el('strong', { textContent: 'Authorization Code Grant' }), ' and ', el('strong', { textContent: 'Public Client' }), ' (PKCE, no secret). Leave TBA unchecked.']),
+                        el('li', null, ['Scope: check ', el('strong', { textContent: 'NetSuite AI Connector Service' }), ' only (not RESTlets / REST Web Services).']),
+                        el('li', null, ['Redirect URI: paste exactly ', el('code', { textContent: '(shown above)' }), ' - the Copy button next to the redirect URI gives you the value.']),
+                        el('li', null, ['Save and copy the generated ', el('strong', { textContent: 'Client ID' }), ' into the field above. The Client Secret is not used.']),
+                        el('li', null, ['Make sure the AI Connector SuiteApp is installed and your user has a role with ', el('strong', { textContent: 'MCP Server Connection' }), ' and ', el('strong', { textContent: 'Log in using OAuth 2.0 Access Tokens' }), '. Administrator is blocked by NetSuite for MCP; pick that role on the sign-in page.']),
+                        el('li', null, ['Optional: raise the refresh-token lifetime (Setup > Integration > OAuth 2.0 settings) toward 30 days so sign-in is rare.'])
+                    ])
+                ])
+            ])
+        ]);
+
+        var mcpCard = el('div', { className: 'tacta-ai-set-card' }, [
+            el('h3', { className: 'tacta-ai-set-card-title', textContent: 'NetSuite AI Connector (MCP)' }),
+            el('p', { className: 'tacta-ai-set-card-desc', textContent: 'Connects the assistant to NetSuite\'s own MCP server for the account you are working in, so Claude\'s tool calls (SuiteQL, records, saved searches, reports) run inside NetSuite as you, through NetSuite-supported tools. You sign in with OAuth 2.0 in the browser; tokens stay in this browser profile and refresh silently. Without it, the assistant falls back to the extension\'s read-only SuiteQL and Records Catalog tools.' }),
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Account', el('small', { textContent: 'Read from the NetSuite tab you have open' })]),
+                el('div', { className: 'tacta-ai-set-control' }, [mcpAccount])
+            ]),
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Redirect URI', el('small', { textContent: 'Put this on the integration record' })]),
+                el('div', { className: 'tacta-ai-set-control' }, [mcpRedirect, mcpRedirectCopy])
+            ]),
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Client ID', el('small', { textContent: 'From the integration record for this account' })]),
+                el('div', { className: 'tacta-ai-set-control' }, [mcpClientId])
+            ]),
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Connection']),
+                el('div', { className: 'tacta-ai-set-control', style: { flexWrap: 'wrap' } }, [mcpSignInBtn, mcpRefreshBtn, mcpSignOutBtn, mcpStatus])
+            ]),
+            mcpToolList,
+            el('div', { className: 'tacta-ai-set-row' }, [
+                el('div', { className: 'tacta-ai-set-label' }, ['Allow write tools', el('small', { textContent: 'ns_createRecord, ns_updateRecord and similar. Each use asks you to confirm.' })]),
+                el('div', { className: 'tacta-ai-set-control' }, [mcpWritesToggle, mcpWritesStatus])
+            ]),
+            mcpGuide
+        ]);
+        root.appendChild(mcpCard);
+        var _mcpLoadedOnce = false;
+        function syncMcpVisibility() {
+            mcpCard.classList.toggle('tacta-ai-set-hidden', state.provider !== 'bedrock');
+            if (state.provider === 'bedrock' && !_mcpLoadedOnce) { _mcpLoadedOnce = true; loadMcp(); }
+        }
+
         // ── NetSuite card ──
         var scriptInput = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: 'customscript_tacta_rl_netsuite_llm or 1234', spellcheck: 'false' });
         var deployInput = el('input', { className: 'tacta-ai-set-input', type: 'text', placeholder: 'customdeploy_tacta_rl_netsuite_llm or 1', spellcheck: 'false' });
@@ -638,6 +777,7 @@
             });
             bedrockCard.classList.toggle('tacta-ai-set-hidden', state.provider !== 'bedrock');
             netsuiteCard.classList.toggle('tacta-ai-set-hidden', state.provider !== 'netsuite');
+            if (typeof syncMcpVisibility === 'function') syncMcpVisibility();
             testBtn.disabled = state.provider === 'none';
         }
 
