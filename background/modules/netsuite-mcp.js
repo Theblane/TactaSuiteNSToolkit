@@ -35,7 +35,7 @@ const DEFAULT_SCOPE = 'mcp';
 const TOOL_LIST_TTL_MS = 10 * 60 * 1000;
 // Tools whose names suggest they change data. Hidden unless the user enables
 // writes; when enabled, each call is confirmed in the chat panel first.
-export const RE_WRITE_TOOL = /create|update|delete|remove|submit|attach|detach|transform|write|cancel|approve|void|insert|upsert|set[A-Z_]/i;
+export const RE_WRITE_TOOL = /create|update|delete|remove|submit|attach|detach|transform|upload|execute|write|cancel|approve|void|insert|upsert|rename|move|purge|set[A-Z_]/i;
 
 // ---------------------------------------------------------------------------
 // Account resolution
