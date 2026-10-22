@@ -100,11 +100,17 @@ The extension requests only what it needs to operate inside NetSuite:
 | `scripting` | Inject content scripts on demand for popup-triggered features (e.g., Field Explorer). |
 | `declarativeContent` | Show the extension action icon only on `*.netsuite.com` pages. |
 | `contextMenus` | Right-click menu entries (e.g., Split View). |
+| `alarms` | Periodic reconnect heartbeat for the optional Claude Desktop bridge (does nothing if the bridge is off). |
 | Host: `https://*.netsuite.com/*`, `https://*.oracle.com/*` | NetSuite uses per-account subdomains (`<accountid>.app.netsuite.com`), so wildcard host access is required. |
+| Optional host: `http://127.0.0.1/*` | Not granted at install. Requested only if you enable the Claude Desktop bridge; used solely to reach the local companion over loopback. |
+
+## Optional: Claude Desktop bridge
+
+The extension can act as a bridge so a desktop MCP client you run (such as Claude Desktop) can query your **live** NetSuite session through your signed-in browser tab - no NetSuite setup, no OAuth, no role switch. It is **off by default**. When enabled, the extension connects out to a small, zero-dependency companion on your own machine over `127.0.0.1`; read-only (SuiteQL `SELECT`/`WITH`) by default. See [`companion/README.md`](./companion/README.md) for setup and [PRIVACY.md](./PRIVACY.md) for what it does and does not send.
 
 ## Privacy
 
-This extension does not collect, transmit, or store any user data on remote servers, and never contacts the developer. It makes no outbound network calls of any kind; all settings and state are stored locally in `chrome.storage.local`. See [PRIVACY.md](./PRIVACY.md).
+This extension does not collect, transmit, or store any user data on remote servers, and never contacts the developer. By default it makes no outbound network calls; the only connection it can make is the optional Claude Desktop bridge to `127.0.0.1` on your own machine, and only if you enable it. All settings and state are stored locally in `chrome.storage.local`. See [PRIVACY.md](./PRIVACY.md).
 
 ## Architecture
 

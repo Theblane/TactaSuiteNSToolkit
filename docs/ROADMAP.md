@@ -1,6 +1,8 @@
 # NetSuite TactaSuite - Roadmap
 
-2026-10-22: The in-extension AI assistant, Bedrock helper, and NetSuite MCP client were removed; the extension is a pure NetSuite toolkit with no AI and no network calls.
+2026-10-22: The in-extension AI assistant, Bedrock helper, and NetSuite MCP client were removed; the extension is a pure NetSuite toolkit with no AI and no in-extension network calls.
+
+2026-10-22 (v1.4.0): Added the optional, off-by-default **Claude Desktop bridge**. The extension becomes an MCP bridge: a desktop MCP client (e.g. Claude Desktop) launches a zero-dependency local companion (`companion/tacta-bridge.mjs`, stdio MCP server + loopback WebSocket on `127.0.0.1`); the extension service worker dials out to it and runs read-only tools (SuiteQL SELECT/WITH, current page, current record fields, list tabs) against the user's live, signed-in NetSuite session. No NetSuite-side setup, no OAuth, no role switch. Read-only by default; writes gated behind an explicit toggle (no write tools shipped yet). New: `alarms` permission (reconnect heartbeat) and optional host permission `http://127.0.0.1/*` (requested on enable). Settings card under Options -> Claude Desktop bridge.
 
 Source: `docs/competitive-review-2026-10-21.md`, `background/modules/feature-registry.js`, `manifest.json`, `STORE_LISTING.md`.
 

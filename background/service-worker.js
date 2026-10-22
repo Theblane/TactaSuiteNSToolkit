@@ -14,6 +14,7 @@ import { FEATURES } from './modules/feature-registry.js';
 import { initDefaults, getFeatureStates, setFeatureState, setFeatureStates, getMeetingMode, setMeetingMode } from './modules/storage-manager.js';
 import { setupContextMenus } from './modules/context-menu-manager.js';
 import { handleScreenshotMessage } from './modules/screenshot.js';
+import { startBridge, stopBridge, getBridgeStatus, getBridgeSettings, setBridgeSettings, generateToken } from './modules/bridge-client.js';
 
 const ONBOARDING_URL = 'onboarding/onboarding.html';
 const OPTIONS_URL = 'options/options.html';
@@ -52,7 +53,70 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
   // DeclarativeContent — show the action icon only on *.netsuite.com pages
   setupDeclarativeContent();
+
+  // Local bridge: reconnect if the user has it enabled.
+  kickBridge();
 });
+
+// ---------------------------------------------------------------------------
+// Local bridge (optional) — connect out to the desktop companion so an MCP
+// client can query the live NetSuite session through the extension.
+// ---------------------------------------------------------------------------
+
+const BRIDGE_ALARM = 'tacta-bridge-reconnect';
+
+/** Capabilities handed to the bridge client so it can run against the live tab. */
+const bridgeDeps = {
+  executeSuiteQL: (tabId, query, params) => executeSuiteQL(tabId, query, params),
+  getPageInfo: (tabId) => getPageInfo(tabId),
+  getRecordFields: (tabId) => nsRunInPage(tabId, feGetRecordFieldsFn, []),
+  findNetSuiteTab: () => findNetSuiteTab(),
+  listNetSuiteTabs: () => listNetSuiteTabs()
+};
+
+function kickBridge() {
+  startBridge(bridgeDeps).catch((e) => console.warn('[TactaSuite] bridge start failed:', e));
+}
+
+// Host permissions for *.netsuite.com / *.oracle.com let us read url/title of
+// those tabs without the broad "tabs" permission; query all and filter here.
+const NS_TAB_RE = /^https:\/\/[^/]*\.(netsuite|oracle)\.com\//i;
+
+async function getNetSuiteTabs() {
+  const tabs = await chrome.tabs.query({});
+  return tabs.filter((t) => t.url && NS_TAB_RE.test(t.url));
+}
+
+/** Find the best NetSuite tab to act on: the active one, else most recent. */
+async function findNetSuiteTab() {
+  const tabs = await getNetSuiteTabs();
+  if (!tabs.length) return null;
+  const active = tabs.find((t) => t.active);
+  const chosen = active || tabs.slice().sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+  return { id: chosen.id, url: chosen.url, title: chosen.title };
+}
+
+async function listNetSuiteTabs() {
+  const tabs = await getNetSuiteTabs();
+  return tabs.map((t) => ({ id: t.id, url: t.url, title: t.title, active: !!t.active }));
+}
+
+// Reconnect the bridge when the browser starts and on a periodic alarm (so a
+// companion started after the service worker went idle is picked up).
+chrome.runtime.onStartup.addListener(() => kickBridge());
+
+chrome.alarms.create(BRIDGE_ALARM, { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === BRIDGE_ALARM) kickBridge();
+});
+
+// Reconnect immediately if the user toggles bridge settings in another context.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.tacta_bridge_settings) kickBridge();
+});
+
+// Cold service-worker start (any wake): attempt to reconnect if enabled.
+kickBridge();
 
 // ---------------------------------------------------------------------------
 // DeclarativeContent rules
@@ -238,6 +302,32 @@ async function handleMessage(message, sender) {
       await chrome.tabs.create({ url: chrome.runtime.getURL(ONBOARDING_URL + step) });
       return { success: true };
     }
+
+    // -- Local bridge -------------------------------------------------------
+    case 'getBridgeSettings': {
+      const settings = await getBridgeSettings();
+      return { settings, status: getBridgeStatus(), extensionId: chrome.runtime.id };
+    }
+
+    case 'setBridgeSettings': {
+      const settings = await setBridgeSettings(message.settings || {});
+      await startBridge(bridgeDeps);
+      return { settings, status: getBridgeStatus() };
+    }
+
+    case 'getBridgeStatus':
+      return getBridgeStatus();
+
+    case 'generateBridgeToken':
+      return { token: generateToken() };
+
+    case 'restartBridge':
+      await startBridge(bridgeDeps);
+      return { status: getBridgeStatus() };
+
+    case 'stopBridge':
+      stopBridge();
+      return { status: getBridgeStatus() };
 
     default: {
       // Delegated handler (Screenshot Studio). Returns undefined when the

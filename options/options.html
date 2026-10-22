@@ -199,6 +199,21 @@
                 </div>
             </section>
 
+            <!-- ── Claude Desktop bridge (optional) ───────────────── -->
+            <section class="tacta-opt-section" id="bridge">
+                <h2 class="tacta-opt-section-title">Claude Desktop bridge <span class="tacta-opt-badge">Optional</span></h2>
+                <p class="tacta-opt-section-desc">
+                    Let a desktop MCP client (such as Claude Desktop) query your live
+                    NetSuite instance through this extension, using your signed-in
+                    browser session. No NetSuite setup, no OAuth, no role switch. A
+                    small local companion runs on your PC and talks to the extension
+                    over a loopback connection on 127.0.0.1 only. Read-only by default.
+                </p>
+                <div id="bridgeCard" class="tacta-opt-bridge">
+                    <p class="tacta-opt-bridge-loading">Loading bridge status…</p>
+                </div>
+            </section>
+
             <!-- ── About ──────────────────────────────────────────── -->
             <section class="tacta-opt-section tacta-opt-about">
                 <h2 class="tacta-opt-section-title">About</h2>
@@ -213,7 +228,7 @@
                     </div>
                     <div class="tacta-opt-about-row">
                         <span class="tacta-opt-about-label">Version</span>
-                        <span class="tacta-opt-about-value tacta-opt-mono">v1.2.0</span>
+                        <span class="tacta-opt-about-value tacta-opt-mono">v1.4.0</span>
                     </div>
                     <div class="tacta-opt-about-row">
                         <span class="tacta-opt-about-label">Features</span>
@@ -234,7 +249,7 @@
         <!-- ── Footer ─────────────────────────────────────────────── -->
         <footer class="tacta-opt-footer">
             <span class="tacta-opt-footer-brand">NetSuite TactaSuite</span>
-            <span class="tacta-opt-footer-version">v1.2.0</span>
+            <span class="tacta-opt-footer-version">v1.4.0</span>
         </footer>
     </div>
 
@@ -243,6 +258,7 @@
 
     <script src="../shared/theme-manager.js"></script>
     <script src="../shared/author-links.js"></script>
+    <script src="../shared/bridge-settings-ui.js"></script>
     <script src="options.js"></script>
 </body>
 </html>

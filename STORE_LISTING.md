@@ -63,8 +63,11 @@ Single-purpose statements that mention "and 30+ productivity tools" or read like
 > • Navigation Search - keyboard-driven fuzzy search across menu items (Ctrl+Shift+K); paste a script or record id to open it.
 > • Portlet auto-refresh, Dataset to SuiteQL, CSV Template Generator, Search URL Builder, PDF Template Tools, CSV Import Viewer, Workflow Colors, Better Page Titles.
 >
+> **Optional: Claude Desktop bridge**
+> An off-by-default feature lets a desktop MCP client you run (such as Claude Desktop) query your live NetSuite session through the extension, using your signed-in browser tab. No NetSuite setup, no OAuth, no role switch. It connects only to a small companion program on your own computer over `127.0.0.1`, is read-only by default, and never contacts the developer or any third party. Leave it off and the extension makes no network calls at all.
+>
 > **Privacy first**
-> No analytics. No data collection. No calls to the developer. The extension makes no outbound network calls of any kind; all settings live in `chrome.storage.local` on your machine. See PRIVACY.md in the project source for details.
+> No analytics. No data collection. No calls to the developer. All settings live in `chrome.storage.local` on your machine. By default the extension makes no outbound network calls; the only connection it can make is the optional local bridge above, to `127.0.0.1` on your own computer. See PRIVACY.md in the project source for details.
 >
 > **Modes**
 > A built-in "Meeting Mode" toggle suppresses every visual modification at once so the UI looks stock during screen shares.
@@ -97,9 +100,17 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 > Adds a right-click menu item ("Open in Split View") that appears only on `*.netsuite.com` pages. The menu lets users open the current page or a link in a side-by-side split pane without leaving NetSuite.
 
+### `alarms`
+
+> Runs a periodic reconnect check (once per minute) for the optional Claude Desktop bridge, so that if the local companion is started after the service worker went idle, the extension reconnects to it. Used for nothing else. If the bridge is left disabled, the alarm simply does nothing.
+
 ### Host permission: `https://*.netsuite.com/*`
 
-> NetSuite assigns each customer account a unique subdomain - for example `1234567.app.netsuite.com`, `1234567-sb1.app.netsuite.com`, `system.netsuite.com`. Because the user's account ID is variable and unknown at install time, the extension must use a wildcard host permission to function across the user's production account, sandbox accounts, and the shared system subdomain. The extension does not declare host access for any other origin.
+> NetSuite assigns each customer account a unique subdomain - for example `1234567.app.netsuite.com`, `1234567-sb1.app.netsuite.com`, `system.netsuite.com`. Because the user's account ID is variable and unknown at install time, the extension must use a wildcard host permission to function across the user's production account, sandbox accounts, and the shared system subdomain. The extension declares host access for `https://*.netsuite.com/*` and `https://*.oracle.com/*` only.
+
+### Optional host permission: `http://127.0.0.1/*`
+
+> Not granted at install time. Requested only if the user enables the optional Claude Desktop bridge, and used only to connect to a companion program on the user's own machine over loopback (`127.0.0.1`). The extension never connects to any remote `http://` origin; this permission exists solely for the local, user-initiated bridge.
 
 ---
 
@@ -107,7 +118,7 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 CWS asks whether the extension uses remote code (eval, remote scripts, etc.). Answer: **No**.
 
-> All code shipped with this extension runs from local files included in the package. There is no `eval()`, no `new Function()`, no remote script loading, and no remotely hosted modules. The extension makes no network calls and never downloads or executes code.
+> All code shipped with this extension runs from local files included in the package. There is no `eval()`, no `new Function()`, no remote script loading, and no remotely hosted modules. The extension never downloads or executes code. The optional Claude Desktop bridge connects only to a loopback companion on the user's own machine and does not fetch or run any remote code. (The companion program under `companion/` runs separately under the user's own Node.js runtime; the extension does not load or execute it.)
 
 ---
 
@@ -125,7 +136,7 @@ For each item below, check **"I do not collect this"** unless noted otherwise.
 | Location | Not collected | |
 | Web history | Not collected | The extension's content scripts run only on `*.netsuite.com` - no other browsing data is read. |
 | User activity | Not collected | No clickstream or interaction logging is captured or sent. |
-| Website content | Not collected | DOM is read inside NetSuite pages purely to render features locally. Nothing is uploaded. |
+| Website content | Not collected | DOM is read inside NetSuite pages purely to render features locally. Nothing is uploaded to any remote server. If the user enables the optional Claude Desktop bridge, NetSuite query/record data is passed to a companion on the user's own machine (loopback `127.0.0.1`) and on to the user's own MCP client; it is not transmitted off-device by the extension. |
 
 Also affirm:
 - ☑ I do not sell or transfer user data to third parties.
@@ -194,7 +205,7 @@ You already have `icons/icon128.png` in the extension. CWS will pull it from `ma
 ## Pre-submission Checklist
 
 - [ ] Publishing under the Blane Maher–owned developer account (not a personal Google account).
-- [ ] Version in `manifest.json` matches the version you intend to submit (currently `1.2.0`).
+- [ ] Version in `manifest.json` matches the version you intend to submit (currently `1.4.0`).
 - [ ] Zip the **`TactaSuiteNSToolkit/`** folder contents at the root (do not nest inside another folder when zipping). Test the zip by unpacking it and loading it via `Load unpacked` before uploading.
 - [ ] `PRIVACY.md` is hosted at a public URL.
 - [ ] Five 1280×800 screenshots saved under `store-assets/screenshots/`.
