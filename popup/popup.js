@@ -20,11 +20,10 @@
 
     /* ── Constants ─────────────────────────────────────────────────── */
 
-    const GROUP_ORDER = ['ai', 'developer', 'search', 'record', 'layout', 'misc'];
+    const GROUP_ORDER = ['developer', 'search', 'record', 'layout', 'misc'];
 
     /** Labels for display (groups are stored lowercase in the registry) */
     const GROUP_LABELS = {
-        ai:        'AI',
         developer: 'Developer',
         search:    'Search',
         record:    'Record',
@@ -37,7 +36,7 @@
 
     /** Quick-action button IDs — must stay in sync with popup.html */
     const QUICK_ACTIONS = [
-        'field-explorer', 'record-object', 'script-explorer', 'suiteql-runner', 'ai-assistant',
+        'field-explorer', 'record-object', 'script-explorer', 'suiteql-runner',
         'screenshot-studio', 'csv-template-generator', 'audit-trail', 'search-url-builder',
         'script-content-search',
     ];
@@ -81,7 +80,6 @@
     const $accentColor    = document.getElementById('accentColor');
     const $closeOutside   = document.getElementById('closeOnClickOutside');
     const $runWalkthrough = document.getElementById('runWalkthroughBtn');
-    const $aiSettingsBtn  = document.getElementById('aiSettingsBtn');
     const $allSettingsBtn = document.getElementById('allSettingsBtn');
 
 
@@ -544,13 +542,6 @@
             $runWalkthrough.addEventListener('click', () => {
                 sendMessage({ action: 'openOnboarding' }).then(() => window.close()).catch(() => {
                     chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/onboarding.html') });
-                });
-            });
-        }
-        if ($aiSettingsBtn) {
-            $aiSettingsBtn.addEventListener('click', () => {
-                sendMessage({ action: 'openOptions', hash: 'ai' }).then(() => window.close()).catch(() => {
-                    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#ai') });
                 });
             });
         }

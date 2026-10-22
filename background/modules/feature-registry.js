@@ -587,24 +587,5 @@ export const FEATURES = [
     contentScripts: ['content/features/screenshot-studio/screenshot-studio.js'],
     contentStyles: ['content/features/screenshot-studio/screenshot-studio.css'],
     injectScripts: []
-  },
-  // ── AI ────────────────────────────────────────────────────────────────────
-  {
-    id: 'ai-assistant',
-    label: 'AI Assistant',
-    group: 'ai',
-    description: 'Ask questions about the NetSuite account you are signed in to. Answers come from read-only SuiteQL, the Records Catalog and the record on screen. Claude on Amazon Bedrock or NetSuite AI, your choice.',
-    defaultEnabled: false,
-    audience: ['admin', 'developer'],
-    onboarding: {
-      summary: 'A grounded assistant for this account. It can only read, never write, and sends nothing until you configure a provider and press Send.',
-      where: 'Toolkit menu on any NetSuite page. Configure under Settings > AI Assistant.'
-    },
-    pageTypes: ['record-view', 'record-edit', 'search-results', 'search-edit', 'search-list', 'script-record', 'suitelet',
-                'dashboard', 'list', 'setup', 'pdf-template', 'csv-import', 'file-cabinet', 'workflow', 'dataset', 'workbook', 'other'],
-    trigger: 'popup',
-    contentScripts: ['content/features/ai-assistant/ai-assistant.js'],
-    contentStyles: ['content/features/ai-assistant/ai-assistant.css'],
-    injectScripts: []
   }
 ];

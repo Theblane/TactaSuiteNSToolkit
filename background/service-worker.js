@@ -13,8 +13,6 @@
 import { FEATURES } from './modules/feature-registry.js';
 import { initDefaults, getFeatureStates, setFeatureState, setFeatureStates, getMeetingMode, setMeetingMode } from './modules/storage-manager.js';
 import { setupContextMenus } from './modules/context-menu-manager.js';
-import { handleAiMessage } from './modules/ai-provider.js';
-import { handleMcpMessage } from './modules/netsuite-mcp.js';
 import { handleScreenshotMessage } from './modules/screenshot.js';
 
 const ONBOARDING_URL = 'onboarding/onboarding.html';
@@ -242,18 +240,8 @@ async function handleMessage(message, sender) {
     }
 
     default: {
-      // Delegated handlers (AI assistant, Screenshot Studio). Each returns
-      // undefined when the action is not one of its own.
-      const deps = {
-        executeSuiteQL,
-        runInPage: nsRunInPage,
-        getPageInfo,
-        getRecordFields: (tabId) => nsRunInPage(tabId, feGetRecordFieldsFn, [])
-      };
-      const aiResult = await handleAiMessage(message, sender, deps);
-      if (aiResult !== undefined) return aiResult;
-      const mcpResult = await handleMcpMessage(message, sender, { ...deps, findNetSuiteTab });
-      if (mcpResult !== undefined) return mcpResult;
+      // Delegated handler (Screenshot Studio). Returns undefined when the
+      // action is not one of its own.
       const shotResult = await handleScreenshotMessage(message, sender);
       if (shotResult !== undefined) return shotResult;
       throw new Error(`Unrecognised action: ${message.action}`);
@@ -376,17 +364,6 @@ async function executeSuiteQL(tabId, query, params) {
 // ---------------------------------------------------------------------------
 // Generic page-world execution helper
 // ---------------------------------------------------------------------------
-
-/** Most recently active NetSuite tab, for calls that come from extension pages. */
-async function findNetSuiteTab() {
-  const isNs = (t) => t && t.url && /^https:\/\/[^/]+\.(netsuite|oracle)\.com\//.test(t.url);
-  const active = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (active[0] && isNs(active[0])) return active[0].id;
-  const all = await chrome.tabs.query({ url: ['https://*.netsuite.com/*', 'https://*.oracle.com/*'] });
-  all.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-  if (!all.length) throw new Error('Open a NetSuite tab first; the AI Connector account is taken from it.');
-  return all[0].id;
-}
 
 async function nsRunInPage(tabId, func, args) {
   const results = await chrome.scripting.executeScript({

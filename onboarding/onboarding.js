@@ -8,7 +8,7 @@
  * persists progress so closing the tab mid-way loses nothing.
  *
  * Steps: Welcome -> Who are you? -> Feature pages (by group, max 5 per page)
- *        -> Appearance -> AI assistant (optional) -> You're set
+ *        -> Appearance -> You're set
  *
  * Storage keys written (chrome.storage.local):
  *   tacta_user_type            'user' | 'admin' | 'developer'
@@ -33,7 +33,7 @@
 
     /* Constants */
 
-    const GROUP_ORDER = ['developer', 'search', 'record', 'layout', 'misc', 'ai'];
+    const GROUP_ORDER = ['developer', 'search', 'record', 'layout', 'misc'];
 
     const GROUP_LABELS = {
         developer: 'Developer',
@@ -250,7 +250,6 @@
         }
 
         list.push({ id: 'appearance', milestone: 'Appearance', label: 'Appearance',   render: renderAppearance });
-        list.push({ id: 'ai',         milestone: 'AI',         label: 'AI assistant', render: renderAI });
         list.push({ id: 'done',       milestone: 'Done',       label: "You're set",   render: renderDone });
         steps = list;
     }
@@ -619,33 +618,6 @@
     function revertThemePreview() {
         if (!window.TactaThemeManager) return;
         window.TactaThemeManager.apply(themeStored || { scheme: DEFAULT_SCHEME, accent: DEFAULT_ACCENT });
-    }
-
-
-    /* Rendering: AI assistant */
-
-    function renderAI() {
-        renderHeader(
-            'AI assistant (optional)',
-            'TactaSuite can connect to an AI assistant for things like explaining scripts and drafting SuiteQL. ' +
-            'This step is optional - skip it if you do not have a key yet.'
-        );
-
-        const mount = el('div');
-        mount.id = 'aiSettingsMount';
-        $step.appendChild(mount);
-
-        const ui = window.TactaAISettingsUI;
-        if (ui && typeof ui.render === 'function') {
-            try {
-                ui.render(mount, { compact: true });
-                return;
-            } catch (err) {
-                console.error('[Onboarding] TactaAISettingsUI.render failed:', err);
-                clear(mount);
-            }
-        }
-        mount.appendChild(el('p', 'tacta-ob-note', 'AI setup is available later in Settings.'));
     }
 
 

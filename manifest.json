@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NetSuite TactaSuite",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Unified NetSuite developer toolkit — field explorer, search export, script analysis, and 30+ productivity tools.",
   "author": "Blane Maher",
   "homepage_url": "https://github.com/Theblane/TactaSuiteNSToolkit",
@@ -24,17 +24,11 @@
     "activeTab",
     "scripting",
     "declarativeContent",
-    "contextMenus",
-    "identity"
+    "contextMenus"
   ],
   "host_permissions": [
     "https://*.netsuite.com/*",
     "https://*.oracle.com/*"
-  ],
-  "optional_host_permissions": [
-    "https://*.amazonaws.com/*",
-    "http://127.0.0.1/*",
-    "http://localhost/*"
   ],
   "content_scripts": [
     {

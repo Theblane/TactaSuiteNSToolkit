@@ -18,10 +18,9 @@
 
     /* ── Constants ─────────────────────────────────────────────────── */
 
-    const GROUP_ORDER = ['ai', 'developer', 'search', 'record', 'layout', 'misc'];
+    const GROUP_ORDER = ['developer', 'search', 'record', 'layout', 'misc'];
 
     const GROUP_LABELS = {
-        ai:        'AI',
         developer: 'Developer',
         search:    'Search',
         record:    'Record',
@@ -112,7 +111,6 @@
         await loadGeneralSettings();
         await loadQscSettings();
         await loadUserType();
-        mountAiSettings();
         renderAuthor();
         bindEvents();
         scrollToHash();
@@ -131,16 +129,6 @@
         if (!id) return;
         const el = document.getElementById(id);
         if (el) el.scrollIntoView({ block: 'start' });
-    }
-
-    /** The AI settings UI lives in shared/ai-settings-ui.js so onboarding can reuse it. */
-    function mountAiSettings() {
-        const mount = document.getElementById('aiSettingsMount');
-        if (!mount) return;
-        if (window.TactaAISettingsUI && typeof window.TactaAISettingsUI.render === 'function') {
-            mount.innerHTML = '';
-            window.TactaAISettingsUI.render(mount, { compact: false });
-        }
     }
 
     /* ── User type ────────────────────────────────────────────────── */

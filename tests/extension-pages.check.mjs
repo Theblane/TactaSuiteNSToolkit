@@ -87,12 +87,10 @@ if (!afterRole.nextDisabled) {
 const stored = await sw.evaluate(() => chrome.storage.local.get(['tacta_user_type', 'featureStates', 'tacta_onboarding_progress', 'tacta_theme_settings']));
 console.log('storage after walk:', JSON.stringify({ userType: stored.tacta_user_type, progress: stored.tacta_onboarding_progress, enabledCount: Object.values(stored.featureStates || {}).filter(Boolean).length, theme: stored.tacta_theme_settings }));
 
-await check('options', base + 'options/options.html#ai', () => ({
+await check('options', base + 'options/options.html', () => ({
   title: document.title,
   featureCards: document.querySelectorAll('.tacta-opt-feature-card').length,
   groups: Array.from(document.querySelectorAll('.tacta-opt-group-name')).map((e) => e.textContent),
-  aiMounted: !!document.querySelector('#aiSettingsMount .tacta-ai-set-root, #aiSettingsMount [class*="tacta-ai-set"]'),
-  aiMountText: document.getElementById('aiSettingsMount')?.textContent.trim().slice(0, 80),
   userType: document.getElementById('userTypeSelect')?.value,
   scheme: document.documentElement.dataset.tactaTheme
 }));

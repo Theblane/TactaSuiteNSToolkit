@@ -28,7 +28,7 @@ await new Promise((r) => setTimeout(r, 1000));
 
 const report = await sw.evaluate(async () => {
   const out = { onInstalledListeners: chrome.runtime.onInstalled.hasListeners(), onMessageListeners: chrome.runtime.onMessage.hasListeners(), imports: {} };
-  for (const m of ['feature-registry.js', 'storage-manager.js', 'context-menu-manager.js', 'ai-provider.js', 'screenshot.js']) {
+  for (const m of ['feature-registry.js', 'storage-manager.js', 'context-menu-manager.js', 'screenshot.js']) {
     try {
       const mod = await import(chrome.runtime.getURL('background/modules/' + m));
       out.imports[m] = 'ok: ' + Object.keys(mod).join(',');
