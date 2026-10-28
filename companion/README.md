@@ -26,6 +26,16 @@ The extension dials out to the companion (rather than the reverse) because an
 extension cannot run a server, and an open WebSocket keeps the extension's
 Manifest V3 service worker alive.
 
+## Multiple Claude Desktop sessions
+
+Claude Desktop may launch the companion more than once (for example one copy
+for regular chats and another for Cowork or Code sessions). Only one copy can
+own the loopback port, so the first one to bind it becomes the primary and
+talks to the extension. Any later copy connects to the primary as a relay and
+forwards its tool calls through it. If the primary exits, a secondary takes
+over the port and the extension reconnects on its normal retry cycle. All
+copies must use the same `TACTA_BRIDGE_TOKEN`.
+
 ## Install
 
 1. Install [Node.js](https://nodejs.org) 18 or newer.
@@ -94,7 +104,14 @@ Example config:
 
 - **Status stays "Not connected":** make sure the companion is running (Claude
   Desktop launches it), the port and token match, and a NetSuite tab is open.
-- **"port already in use":** set `TACTA_BRIDGE_PORT` to a free port in both the
-  config and the extension settings.
+- **"port already in use" by something other than the companion:** set
+  `TACTA_BRIDGE_PORT` to a free port in both the config and the extension
+  settings. A second copy of the companion itself is fine; it relays through
+  the first.
+- **Status stays "Connecting" in Claude Desktop:** the config was copied from
+  another PC. The `command` path to node.exe, the `args` path to
+  `tacta-bridge.mjs`, and the pairing token are all specific to your machine
+  and your browser. Generate your own token in the extension and fix both
+  paths, then check `%APPDATA%\Claude\logs\mcp-server-netsuite-tactasuite.log`.
 - **Tool says the extension is not connected:** open your NetSuite tab and
   confirm the bridge toggle is on; the extension reconnects within ~1 minute.

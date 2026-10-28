@@ -15,13 +15,26 @@
  *      extension, which runs them in the user's live NetSuite tab and returns
  *      the result.
  *
+ * Multiple instances:
+ *   Claude Desktop may launch this script more than once (for example one copy
+ *   for regular chats and another for Cowork / Code sessions). Only one process
+ *   can own the loopback port, and the extension only connects to that port.
+ *
+ *   - PRIMARY: the first copy to bind the port. It owns the extension
+ *     connection and also accepts "relay" connections from other copies.
+ *   - SECONDARY: any copy that finds the port already in use. Instead of
+ *     exiting, it connects to the primary as a relay client (authenticated with
+ *     the same pairing token) and forwards its tool calls through it.
+ *   - FAILOVER: if the primary exits, its secondaries race to bind the port.
+ *     One wins and becomes the new primary; the rest relay through it. The
+ *     extension reconnects to the new primary on its normal retry cycle.
+ *
  * Security model (localhost dev bridge):
- *   - WebSocket server binds 127.0.0.1 only (never 0.0.0.0), so only local
+ *   - The server binds 127.0.0.1 only (never 0.0.0.0), so only local
  *     processes can reach it.
- *   - Every connection must present a shared pairing token (TACTA_BRIDGE_TOKEN)
- *     that the user copied from the extension's settings. Wrong/absent token
- *     is rejected.
- *   - The connection Origin must be a chrome-extension:// origin. If
+ *   - Every connection (extension or relay) must present the shared pairing
+ *     token (TACTA_BRIDGE_TOKEN). Wrong/absent token is rejected.
+ *   - Extension connections must come from a chrome-extension:// origin. If
  *     TACTA_BRIDGE_EXT_ID is set, it must match exactly.
  *   - Read-only by default. Write tools are gated on the extension side and
  *     are not exposed here yet.
@@ -34,15 +47,18 @@
  * All diagnostic logging goes to stderr. stdout is reserved for MCP.
  */
 
-import { createServer } from 'node:net';
-import { createHash, randomUUID } from 'node:crypto';
+import { createServer, connect } from 'node:net';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createInterface } from 'node:readline';
+import { StringDecoder } from 'node:string_decoder';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const TOKEN = process.env.TACTA_BRIDGE_TOKEN || '';
 const PORT = Number(process.env.TACTA_BRIDGE_PORT || 8787);
 const EXPECTED_EXT_ID = process.env.TACTA_BRIDGE_EXT_ID || '';
 const CALL_TIMEOUT_MS = 60000;
+const RELAY_MAGIC = 'TACTA-RELAY';
+const RELAY_WELCOME_TIMEOUT_MS = 3000;
 
 function log(...args) {
   process.stderr.write('[tacta-bridge] ' + args.map(String).join(' ') + '\n');
@@ -52,6 +68,12 @@ if (!TOKEN) {
   log('FATAL: TACTA_BRIDGE_TOKEN is not set. Copy the pairing token from the');
   log('extension settings (Claude Desktop bridge card) into this launcher.');
   process.exit(1);
+}
+
+function tokenOk(candidate) {
+  const a = Buffer.from(String(candidate || ''), 'utf8');
+  const b = Buffer.from(TOKEN, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,13 +129,52 @@ const TOOLS = [
 const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
 
 // ---------------------------------------------------------------------------
-// WebSocket server (hand-rolled, zero dependency). Single client: the
-// extension service worker. Binds 127.0.0.1 only.
+// Shared helpers: newline-delimited JSON over a raw TCP socket (relay link).
+// ---------------------------------------------------------------------------
+
+function writeLine(socket, obj) {
+  try { socket.write(JSON.stringify(obj) + '\n'); } catch (_) {}
+}
+
+function lineReader(onMsg) {
+  const decoder = new StringDecoder('utf8');
+  let buf = '';
+  return (chunk) => {
+    buf += typeof chunk === 'string' ? chunk : decoder.write(chunk);
+    let i;
+    while ((i = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch (_) { continue; }
+      onMsg(msg);
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Instance role
+// ---------------------------------------------------------------------------
+
+let mode = 'starting';          // 'starting' | 'primary' | 'secondary'
+let server = null;              // primary: the listening net.Server
+
+// Primary state
+let activeSocket = null;        // the paired extension WS connection, or null
+const pending = new Map();      // callId -> { resolve, reject, timer }
+const relayClients = new Set(); // connected secondary instances
+
+// Secondary state
+let relaySocket = null;         // connection to the primary, once welcomed
+const relayPending = new Map(); // callId -> { resolve, reject, timer }
+let loggedWaitingForPrimary = false;
+
+// ---------------------------------------------------------------------------
+// WebSocket server (hand-rolled, zero dependency). Single extension client.
 // ---------------------------------------------------------------------------
 
 const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-let activeSocket = null;        // the paired WS connection (net.Socket), or null
-const pending = new Map();      // callId -> { resolve, reject, timer }
 
 function wsAccept(key) {
   return createHash('sha1').update(key + WS_MAGIC).digest('base64');
@@ -209,7 +270,8 @@ function handleFrames(socket, state, onMessage) {
     buf = buf.slice(offset + len);
 
     if (opcode === 0x8) { // close
-      closeActive('client close');
+      if (socket === activeSocket) closeActive('client close');
+      else { try { socket.destroy(); } catch (_) {} }
       state.buf = Buffer.alloc(0);
       return;
     } else if (opcode === 0x9) { // ping -> pong
@@ -228,107 +290,250 @@ function handleFrames(socket, state, onMessage) {
   state.buf = buf;
 }
 
-const server = createServer((socket) => {
-  let upgraded = false;
-  let headerBuf = Buffer.alloc(0);
-  const state = { buf: Buffer.alloc(0), fragments: [] };
+/**
+ * Primary side: accept a relay connection from a secondary instance.
+ * Returns a feed function for subsequent socket data, or null if rejected.
+ */
+function acceptRelay(socket, token) {
+  if (!tokenOk(token)) {
+    log('rejected relay connection: bad or missing token');
+    writeLine(socket, { type: 'error', message: 'Invalid pairing token.' });
+    socket.end();
+    return null;
+  }
+  relayClients.add(socket);
+  socket.on('close', () => {
+    relayClients.delete(socket);
+    log('secondary instance detached (' + relayClients.size + ' attached)');
+  });
+  writeLine(socket, { type: 'relay-welcome', server: 'tacta-bridge', version: VERSION });
+  log('secondary instance attached (' + relayClients.size + ' attached)');
 
-  socket.on('data', (chunk) => {
-    if (!upgraded) {
-      headerBuf = Buffer.concat([headerBuf, chunk]);
-      const sep = headerBuf.indexOf('\r\n\r\n');
-      if (sep === -1) return;
-      const raw = headerBuf.slice(0, sep).toString('utf8');
-      const rest = headerBuf.slice(sep + 4);
-      const headers = parseHeaders(raw);
-      const key = headers['sec-websocket-key'];
-      const origin = headers['origin'] || '';
-
-      if (!key) { socket.end('HTTP/1.1 400 Bad Request\r\n\r\n'); return; }
-      if (!origin.startsWith('chrome-extension://')) {
-        log('rejected connection: non-extension origin', origin || '(none)');
-        socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
-        return;
-      }
-      if (EXPECTED_EXT_ID && origin !== 'chrome-extension://' + EXPECTED_EXT_ID) {
-        log('rejected connection: extension id mismatch', origin);
-        socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
-        return;
-      }
-
-      socket.write(
-        'HTTP/1.1 101 Switching Protocols\r\n' +
-        'Upgrade: websocket\r\n' +
-        'Connection: Upgrade\r\n' +
-        'Sec-WebSocket-Accept: ' + wsAccept(key) + '\r\n\r\n'
-      );
-      upgraded = true;
-      state.origin = origin;
-      state.buf = rest;
-      if (rest.length) handleFrames(socket, state, onMessage);
+  return lineReader((msg) => {
+    if (msg.type !== 'call' || !msg.id) return;
+    if (!TOOL_NAMES.has(msg.tool)) {
+      writeLine(socket, { type: 'result', id: msg.id, ok: false, error: 'Unknown tool: ' + msg.tool });
       return;
     }
-    state.buf = Buffer.concat([state.buf, chunk]);
-    handleFrames(socket, state, onMessage);
+    callExtensionDirect(msg.tool, msg.args).then(
+      (data) => writeLine(socket, { type: 'result', id: msg.id, ok: true, data }),
+      (e) => writeLine(socket, { type: 'result', id: msg.id, ok: false, error: e.message })
+    );
+  });
+}
+
+function makeServer() {
+  return createServer((socket) => {
+    let upgraded = false;
+    let relayFeed = null;
+    let rejected = false;
+    let headerBuf = Buffer.alloc(0);
+    const state = { buf: Buffer.alloc(0), fragments: [] };
+
+    socket.on('data', (chunk) => {
+      if (rejected) return;
+      if (relayFeed) { relayFeed(chunk); return; }
+
+      if (!upgraded) {
+        headerBuf = Buffer.concat([headerBuf, chunk]);
+
+        // Relay connections from secondary instances start with one line:
+        //   TACTA-RELAY <token>\n
+        // followed by newline-delimited JSON.
+        const nl = headerBuf.indexOf('\n');
+        if (nl === -1) return;
+        if (headerBuf.slice(0, RELAY_MAGIC.length + 1).toString('utf8') === RELAY_MAGIC + ' ') {
+          const first = headerBuf.slice(0, nl).toString('utf8').trim();
+          const rest = headerBuf.slice(nl + 1);
+          relayFeed = acceptRelay(socket, first.slice(RELAY_MAGIC.length + 1));
+          if (!relayFeed) { rejected = true; return; }
+          if (rest.length) relayFeed(rest);
+          return;
+        }
+
+        // Otherwise: WebSocket upgrade from the extension.
+        const sep = headerBuf.indexOf('\r\n\r\n');
+        if (sep === -1) return;
+        const raw = headerBuf.slice(0, sep).toString('utf8');
+        const rest = headerBuf.slice(sep + 4);
+        const headers = parseHeaders(raw);
+        const key = headers['sec-websocket-key'];
+        const origin = headers['origin'] || '';
+
+        if (!key) { socket.end('HTTP/1.1 400 Bad Request\r\n\r\n'); rejected = true; return; }
+        if (!origin.startsWith('chrome-extension://')) {
+          log('rejected connection: non-extension origin', origin || '(none)');
+          socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+          rejected = true;
+          return;
+        }
+        if (EXPECTED_EXT_ID && origin !== 'chrome-extension://' + EXPECTED_EXT_ID) {
+          log('rejected connection: extension id mismatch', origin);
+          socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+          rejected = true;
+          return;
+        }
+
+        socket.write(
+          'HTTP/1.1 101 Switching Protocols\r\n' +
+          'Upgrade: websocket\r\n' +
+          'Connection: Upgrade\r\n' +
+          'Sec-WebSocket-Accept: ' + wsAccept(key) + '\r\n\r\n'
+        );
+        upgraded = true;
+        state.origin = origin;
+        state.buf = rest;
+        if (rest.length) handleFrames(socket, state, onMessage);
+        return;
+      }
+      state.buf = Buffer.concat([state.buf, chunk]);
+      handleFrames(socket, state, onMessage);
+    });
+
+    socket.on('error', (e) => { log('socket error:', e.message); });
+    socket.on('close', () => { if (socket === activeSocket) closeActive('socket closed'); });
+
+    let authed = false;
+    function onMessage(text) {
+      let msg;
+      try { msg = JSON.parse(text); } catch (_) { return; }
+
+      if (!authed) {
+        if (msg.type === 'hello' && tokenOk(msg.token)) {
+          authed = true;
+          if (activeSocket && activeSocket !== socket) closeActive('replaced by new connection');
+          activeSocket = socket;
+          send({ type: 'welcome', server: 'tacta-bridge', version: VERSION });
+          log('extension paired from', state.origin);
+        } else {
+          log('rejected connection: bad or missing token');
+          sendFrame(socket, JSON.stringify({ type: 'error', message: 'Invalid pairing token.' }));
+          sendControl(socket, 0x8);
+          socket.destroy();
+        }
+        return;
+      }
+
+      if (msg.type === 'result' && msg.id && pending.has(msg.id)) {
+        const p = pending.get(msg.id);
+        pending.delete(msg.id);
+        clearTimeout(p.timer);
+        if (msg.ok) p.resolve(msg.data);
+        else p.reject(new Error(msg.error || 'Tool execution failed.'));
+      } else if (msg.type === 'pong') {
+        // heartbeat ack
+      }
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Startup / role election
+// ---------------------------------------------------------------------------
+
+function start() {
+  mode = 'starting';
+  const s = makeServer();
+
+  s.once('listening', () => {
+    server = s;
+    mode = 'primary';
+    loggedWaitingForPrimary = false;
+    log('loopback bridge listening on 127.0.0.1:' + PORT + ' (primary, waiting for extension)');
   });
 
-  socket.on('error', (e) => { log('socket error:', e.message); });
-  socket.on('close', () => { if (socket === activeSocket) closeActive('socket closed'); });
-
-  let authed = false;
-  function onMessage(text) {
-    let msg;
-    try { msg = JSON.parse(text); } catch (_) { return; }
-
-    if (!authed) {
-      if (msg.type === 'hello' && msg.token === TOKEN) {
-        authed = true;
-        if (activeSocket && activeSocket !== socket) closeActive('replaced by new connection');
-        activeSocket = socket;
-        send({ type: 'welcome', server: 'tacta-bridge', version: VERSION });
-        log('extension paired from', state.origin);
-      } else {
-        log('rejected connection: bad or missing token');
-        sendFrame(socket, JSON.stringify({ type: 'error', message: 'Invalid pairing token.' }));
-        sendControl(socket, 0x8);
-        socket.destroy();
-      }
+  s.on('error', (e) => {
+    if (mode === 'starting' && e.code === 'EADDRINUSE') {
+      try { s.close(); } catch (_) {}
+      becomeSecondary();
       return;
     }
+    if (mode === 'starting') {
+      log('FATAL: could not listen on 127.0.0.1:' + PORT + ': ' + e.message);
+      process.exit(1);
+    }
+    log('server error:', e.message);
+  });
 
-    if (msg.type === 'result' && msg.id && pending.has(msg.id)) {
-      const p = pending.get(msg.id);
-      pending.delete(msg.id);
+  s.listen(PORT, '127.0.0.1');
+}
+
+function scheduleStart(delayMs) {
+  setTimeout(start, delayMs);
+}
+
+/**
+ * Secondary side: connect to the primary that owns the port and relay through it.
+ * If the link drops (primary exited), try to take over the port.
+ */
+function becomeSecondary() {
+  mode = 'secondary';
+  const sock = connect(PORT, '127.0.0.1');
+  let welcomed = false;
+
+  const welcomeTimer = setTimeout(() => {
+    if (!welcomed) {
+      if (!loggedWaitingForPrimary) {
+        log('port ' + PORT + ' is in use but did not answer as a tacta-bridge 1.1+ instance.');
+        log('Will keep retrying. If this persists, another program holds the port, or an');
+        log('older tacta-bridge (1.0.x) is still running. Restart Claude Desktop to clear it.');
+        loggedWaitingForPrimary = true;
+      }
+      sock.destroy();
+    }
+  }, RELAY_WELCOME_TIMEOUT_MS);
+
+  const feed = lineReader((msg) => {
+    if (msg.type === 'relay-welcome') {
+      welcomed = true;
+      clearTimeout(welcomeTimer);
+      relaySocket = sock;
+      loggedWaitingForPrimary = false;
+      log('port ' + PORT + ' is owned by another tacta-bridge (' + (msg.version || '?') +
+        '); relaying tool calls through it (secondary)');
+    } else if (msg.type === 'result' && msg.id && relayPending.has(msg.id)) {
+      const p = relayPending.get(msg.id);
+      relayPending.delete(msg.id);
       clearTimeout(p.timer);
       if (msg.ok) p.resolve(msg.data);
       else p.reject(new Error(msg.error || 'Tool execution failed.'));
-    } else if (msg.type === 'pong') {
-      // heartbeat ack
+    } else if (msg.type === 'error') {
+      log('primary rejected relay: ' + (msg.message || 'unknown error') +
+        ' (check that every launcher uses the same TACTA_BRIDGE_TOKEN)');
     }
-  }
-});
+  });
 
-server.on('error', (e) => {
-  if (e.code === 'EADDRINUSE') {
-    log('FATAL: port ' + PORT + ' is already in use. Set TACTA_BRIDGE_PORT to a free port');
-    log('(and the matching port in the extension settings), then restart.');
-  } else {
-    log('server error:', e.message);
-  }
-  process.exit(1);
-});
-
-server.listen(PORT, '127.0.0.1', () => {
-  log('loopback bridge listening on 127.0.0.1:' + PORT + ' (waiting for extension)');
-});
+  sock.on('connect', () => { sock.write(RELAY_MAGIC + ' ' + TOKEN + '\n'); });
+  sock.on('data', feed);
+  sock.on('error', (e) => { if (welcomed) log('relay error:', e.message); });
+  sock.on('close', () => {
+    clearTimeout(welcomeTimer);
+    if (relaySocket === sock) {
+      relaySocket = null;
+      log('lost connection to primary; attempting to take over port ' + PORT);
+    }
+    for (const [, p] of relayPending) {
+      clearTimeout(p.timer);
+      p.reject(new Error('Lost connection to the primary bridge instance. Try again in a moment.'));
+    }
+    relayPending.clear();
+    // After a working link drops, retry quickly with jitter so sibling
+    // secondaries don't all collide. Otherwise back off.
+    scheduleStart(welcomed ? 200 + Math.floor(Math.random() * 600) : 3000);
+  });
+}
 
 // Heartbeat: keep the extension service worker alive and detect dead sockets.
 setInterval(() => { if (activeSocket) send({ type: 'ping', t: Date.now() }); }, 20000);
 
+// ---------------------------------------------------------------------------
+// Tool call routing
+// ---------------------------------------------------------------------------
+
 /**
- * Forward a tool call to the paired extension and await its result.
+ * Primary: forward a tool call to the paired extension and await its result.
  */
-function callExtension(tool, args) {
+function callExtensionDirect(tool, args) {
   return new Promise((resolve, reject) => {
     if (!activeSocket) {
       reject(new Error(
@@ -346,6 +551,33 @@ function callExtension(tool, args) {
     pending.set(id, { resolve, reject, timer });
     send({ type: 'call', id, tool, args: args || {} });
   });
+}
+
+/**
+ * Secondary: send a tool call to the primary over the relay link.
+ */
+function callViaRelay(tool, args) {
+  return new Promise((resolve, reject) => {
+    if (!relaySocket) {
+      reject(new Error(
+        'The bridge is reconnecting to the TactaSuite extension. Try again in a few seconds.'
+      ));
+      return;
+    }
+    const id = randomUUID();
+    const timer = setTimeout(() => {
+      relayPending.delete(id);
+      reject(new Error('Timed out waiting for the extension to respond.'));
+    }, CALL_TIMEOUT_MS + 5000);
+    relayPending.set(id, { resolve, reject, timer });
+    writeLine(relaySocket, { type: 'call', id, tool, args: args || {} });
+  });
+}
+
+function callExtension(tool, args) {
+  if (mode === 'primary') return callExtensionDirect(tool, args);
+  if (mode === 'secondary') return callViaRelay(tool, args);
+  return Promise.reject(new Error('The bridge is still starting up. Try again in a moment.'));
 }
 
 // ---------------------------------------------------------------------------
@@ -419,8 +651,17 @@ rl.on('line', async (line) => {
   }
 });
 
-rl.on('close', () => { closeActive('stdio closed'); process.exit(0); });
-process.on('SIGINT', () => process.exit(0));
-process.on('SIGTERM', () => process.exit(0));
+function shutdown(code) {
+  closeActive('shutting down');
+  for (const s of relayClients) { try { s.destroy(); } catch (_) {} }
+  if (relaySocket) { try { relaySocket.destroy(); } catch (_) {} }
+  if (server) { try { server.close(); } catch (_) {} }
+  process.exit(code);
+}
+
+rl.on('close', () => shutdown(0));
+process.on('SIGINT', () => shutdown(0));
+process.on('SIGTERM', () => shutdown(0));
 
 log('tacta-bridge ' + VERSION + ' ready (MCP on stdio).');
+start();
