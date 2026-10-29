@@ -1,6 +1,6 @@
 {
   "name": "tactasuite-ns-toolkit",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Unified NetSuite developer toolkit",
   "private": true,
   "scripts": {
@@ -8,6 +8,7 @@
     "check:pages": "node tests/extension-pages.check.mjs",
     "check:sw": "node tests/sw-import.check.mjs",
     "check:bridge": "node tests/bridge.check.mjs",
+    "build:zip": "node scripts/build-zip.cjs",
     "verify": "npm test && npm run check:sw && npm run check:pages && npm run check:bridge"
   },
   "devDependencies": {

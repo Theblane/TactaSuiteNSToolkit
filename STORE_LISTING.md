@@ -205,7 +205,7 @@ You already have `icons/icon128.png` in the extension. CWS will pull it from `ma
 ## Pre-submission Checklist
 
 - [ ] Publishing under the Blane Maher–owned developer account (not a personal Google account).
-- [ ] Version in `manifest.json` matches the version you intend to submit (currently `1.4.0`).
+- [ ] Version in `manifest.json` matches the version you intend to submit (currently `1.5.0`).
 - [ ] Zip the **`TactaSuiteNSToolkit/`** folder contents at the root (do not nest inside another folder when zipping). Test the zip by unpacking it and loading it via `Load unpacked` before uploading.
 - [ ] `PRIVACY.md` is hosted at a public URL.
 - [ ] Five 1280×800 screenshots saved under `store-assets/screenshots/`.

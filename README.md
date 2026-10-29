@@ -155,7 +155,14 @@ No build tooling. To make a change:
 
 To add a new feature, register it in `background/modules/feature-registry.js` (including `audience` and `onboarding` copy) and drop content/style files in a matching `content/features/<feature>/` folder. CSS that styles the NetSuite page itself must be listed in the `globalStyles` arrays of `content/router.js` and `content/feature-loader.js`; everything else is injected into the toolkit's shadow root.
 
-Tests: `npx playwright test tests/field-explorer-pageworld.test.ts` (Node 20 or newer on PATH).
+Tests and checks (Node 20 or newer on PATH):
+
+- `npm test` - Playwright page-world test for Field Explorer.
+- `npm run check:sw` - loads the service worker headless and round-trips the feature registry.
+- `npm run check:pages` - opens onboarding, options and popup, asserts the bridge card and feedback form, saves screenshots to `test-results/pages/`.
+- `npm run check:bridge` - end-to-end companion check incl. multi-instance relay and failover.
+- `npm run verify` - all of the above.
+- `npm run build:zip` - builds `tactasuite-ns-toolkit-<version>.zip` (runtime files only, manifest at root) for the Chrome Web Store upload.
 
 ## License
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TactaSuite NS Toolkit",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Unified NetSuite developer toolkit - field explorer, search export, script analysis, and 30+ productivity tools.",
   "author": "Blane Maher",
   "homepage_url": "https://github.com/Theblane/TactaSuiteNSToolkit",
