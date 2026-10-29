@@ -7,7 +7,8 @@
     "test": "playwright test tests/field-explorer-pageworld.test.ts",
     "check:pages": "node tests/extension-pages.check.mjs",
     "check:sw": "node tests/sw-import.check.mjs",
-    "verify": "npm test && npm run check:sw && npm run check:pages"
+    "check:bridge": "node tests/bridge.check.mjs",
+    "verify": "npm test && npm run check:sw && npm run check:pages && npm run check:bridge"
   },
   "devDependencies": {
     "@playwright/test": "^1.38.0",
