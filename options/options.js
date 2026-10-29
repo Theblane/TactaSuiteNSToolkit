@@ -268,10 +268,11 @@
     /* ── Export Settings ──────────────────────────────────────────── */
 
     /**
-     * Storage keys that never travel in an export: the AI settings hold an API
-     * key, and onboarding progress is per install.
+     * Storage keys that never travel in an export: the bridge settings hold the
+     * pairing token (a secret) plus machine-specific paths, legacy AI settings
+     * held an API key, and onboarding progress is per install.
      */
-    const EXPORT_EXCLUDE = /^(tacta_ai_settings|tacta_onboarding_|tacta_update_notice)/;
+    const EXPORT_EXCLUDE = /^(tacta_bridge_settings|tacta_ai_settings|tacta_onboarding_|tacta_update_notice)/;
 
     async function exportSettings() {
         const all = await chrome.storage.local.get(null);

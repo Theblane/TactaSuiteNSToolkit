@@ -303,6 +303,27 @@ async function handleMessage(message, sender) {
       return { success: true };
     }
 
+    // Send feedback form: open the composed mailto: / GitHub issue URL from
+    // here rather than from the popup, because the popup closes as soon as a
+    // new tab takes focus and any cleanup timer it set would die with it. A
+    // mailto: tab hands off to the mail program and is left blank, so we
+    // remove it shortly after.
+    case 'openFeedbackTarget': {
+      const url = String(message.url || '');
+      if (!/^(mailto:|https:\/\/github\.com\/)/i.test(url)) return { success: false, error: 'Unsupported URL.' };
+      const tab = await chrome.tabs.create({ url });
+      if (/^mailto:/i.test(url) && tab && tab.id != null) {
+        setTimeout(async () => {
+          try {
+            const fresh = await chrome.tabs.get(tab.id);
+            const u = (fresh && (fresh.url || fresh.pendingUrl)) || '';
+            if (!u || u === 'about:blank' || /^mailto:/i.test(u)) await chrome.tabs.remove(tab.id);
+          } catch (_) { /* already closed */ }
+        }, 1500);
+      }
+      return { success: true };
+    }
+
     // -- Local bridge -------------------------------------------------------
     case 'getBridgeSettings': {
       const settings = await getBridgeSettings();

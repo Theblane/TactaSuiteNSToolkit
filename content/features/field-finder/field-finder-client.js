@@ -126,6 +126,29 @@
         }
     };
 
+    /**
+     * NetSuite rebuilds a field dropdown's option list in place when its
+     * contents change (for example after choosing a "... Fields..." entry that
+     * repopulates the list). Our option objects then point at detached cells
+     * and stale indexes, and selecting one would call setAndClose() with the
+     * wrong index, which NetSuite reports as "Field not found". Rebuild when
+     * the live arrays no longer match what we indexed.
+     */
+    FieldFinderDropdown.prototype.refreshOptionsIfStale = function () {
+        var ns = this.nsDropdown;
+        var values = ns.valueArray || [];
+        var cells = ns.divArray || [];
+        if (!cells.length && typeof ns.buildDiv === 'function') {
+            try { ns.buildDiv(); cells = ns.divArray || []; } catch (_) { return; }
+        }
+        var stale = this.options.length !== values.length ||
+            (this.options.length > 0 && cells.length > 0 && this.options[0].element !== cells[0]) ||
+            (this.options.length > 0 && !document.contains(this.options[0].element));
+        if (!stale) return;
+        this.prepareOptions();
+        this.filterDropdown();
+    };
+
     FieldFinderDropdown.prototype.addHeader = function () {
         this.header.className = 'tacta-ff-container';
         this.header.setAttribute('onclick', 'event.preventDefault();');
@@ -261,6 +284,7 @@
             var originalOpen = this.nsDropdown.open.bind(this.nsDropdown);
             this.nsDropdown.open = function () {
                 originalOpen();
+                self.refreshOptionsIfStale();
                 self.searchInput.value = '';
                 self.filterDropdown();
                 focusFinder();
@@ -321,6 +345,17 @@
 
     FieldFinderDropdown.prototype.selectOption = function (option) {
         if (!option || option.hidden) return;
+        // Never hand NetSuite an index from a list it has since rebuilt:
+        // re-index, then select the same field id in the fresh list.
+        if (this.nsDropdown.valueArray && this.nsDropdown.valueArray[option.index] !== option.fieldId) {
+            this.refreshOptionsIfStale();
+            var fresh = null;
+            for (var k = 0; k < this.options.length; k++) {
+                if (this.options[k].fieldId === option.fieldId) { fresh = this.options[k]; break; }
+            }
+            if (!fresh || fresh === option || fresh.hidden) return;
+            option = fresh;
+        }
 
         try {
             this.nsDropdown.indexOnDeck = option.index;

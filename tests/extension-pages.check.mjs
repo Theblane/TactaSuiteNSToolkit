@@ -87,24 +87,76 @@ if (!afterRole.nextDisabled) {
 const stored = await sw.evaluate(() => chrome.storage.local.get(['tacta_user_type', 'featureStates', 'tacta_onboarding_progress', 'tacta_theme_settings']));
 console.log('storage after walk:', JSON.stringify({ userType: stored.tacta_user_type, progress: stored.tacta_onboarding_progress, enabledCount: Object.values(stored.featureStates || {}).filter(Boolean).length, theme: stored.tacta_theme_settings }));
 
-await check('options', base + 'options/options.html', () => ({
+const opt = await check('options', base + 'options/options.html', () => ({
   title: document.title,
   featureCards: document.querySelectorAll('.tacta-opt-feature-card').length,
   groups: Array.from(document.querySelectorAll('.tacta-opt-group-name')).map((e) => e.textContent),
   userType: document.getElementById('userTypeSelect')?.value,
-  scheme: document.documentElement.dataset.tactaTheme
+  scheme: document.documentElement.dataset.tactaTheme,
+  // Claude Desktop Bridge card (shared/bridge-settings-ui.js)
+  bridgeBadge: document.querySelector('#bridge .tacta-opt-badge')?.textContent,
+  bridgeEnable: !!document.getElementById('brEnabled'),
+  bridgeSetupFirst: (() => {
+    const card = document.getElementById('bridgeCard');
+    const first = card && card.firstElementChild;
+    return !!(first && first.matches('details.tacta-br-setup') && first.hasAttribute('open'));
+  })(),
+  bridgeSnippets: document.querySelectorAll('#bridgeCard .tacta-br-snippet').length,
+  bridgeSnippetHasExtId: (document.getElementById('brSnippetFull')?.textContent || '').includes(chrome.runtime.id),
+  bridgeSandboxOnly: !!document.getElementById('brSandboxOnly'),
+  bridgeWriteWarning: !!document.querySelector('#bridgeCard .tacta-br-warn strong'),
+  bridgeFaq: document.querySelectorAll('#bridgeCard .tacta-br-faq dt').length,
+  feedbackButtons: document.querySelectorAll('[data-tacta-feedback]').length
 }));
+const optState = opt.state;
+const optProblems = [];
+if (!/beta/i.test(optState.bridgeBadge || '')) optProblems.push('bridge badge should say Beta: ' + optState.bridgeBadge);
+if (!optState.bridgeEnable) optProblems.push('bridge enable switch missing');
+if (!optState.bridgeSetupFirst) optProblems.push('bridge setup steps should be the first, open block in the card');
+if (optState.bridgeSnippets < 3) optProblems.push('expected 3 config snippets (cases A, B, C), got ' + optState.bridgeSnippets);
+if (!optState.bridgeSnippetHasExtId) optProblems.push('config snippet lacks the real extension id');
+if (!optState.bridgeSandboxOnly) optProblems.push('Sandbox only toggle missing');
+if (!optState.bridgeWriteWarning) optProblems.push('write-actions warning missing');
+if (optState.bridgeFaq < 5) optProblems.push('FAQ too short: ' + optState.bridgeFaq);
+if (optState.feedbackButtons < 2) optProblems.push('feedback buttons missing in About');
+console.log('options assertions:', optProblems.length ? optProblems : 'all ok');
+if (optProblems.length) process.exitCode = 1;
 
-await check('popup', base + 'popup/popup.html', () => ({
+// Feedback form opens and composes a mailto: with the message.
+const fb = await opt.page.evaluate(() => {
+  document.querySelector('[data-tacta-feedback="bug"]').click();
+  const dlg = document.querySelector('.tacta-fb');
+  if (!dlg) return { opened: false };
+  document.getElementById('tactaFbTitleIn').value = 'Smoke test';
+  document.getElementById('tactaFbDetails').value = 'Details here';
+  const msg = window.TactaFeedback.buildMessage({ type: 'bug', title: 'Smoke test', details: 'Details here', includeTech: true, features: ['a'], userType: 'developer' });
+  const target = window.TactaFeedback.targetUrl(msg);
+  window.TactaFeedback.close();
+  return { opened: true, kind: target.kind, urlStart: target.url.slice(0, 40), subjectOk: msg.subject.includes('Smoke test'), bodyHasVersion: /Extension: .* v\d/.test(msg.body) };
+});
+console.log('feedback form:', JSON.stringify(fb));
+if (!fb.opened || !fb.subjectOk || !fb.bodyHasVersion) { console.log('feedback form assertions FAILED'); process.exitCode = 1; }
+
+const pop = await check('popup', base + 'popup/popup.html', () => ({
   title: document.title,
   quickActions: document.querySelectorAll('.tacta-action-btn').length,
   groups: Array.from(document.querySelectorAll('.tacta-group-name')).map((e) => e.textContent),
   toggles: document.querySelectorAll('input[data-feature-id]').length,
   gear: !!document.getElementById('settingsToggle'),
   panelHidden: document.getElementById('settingsPanel')?.hasAttribute('hidden'),
+  feedbackBtn: !!document.getElementById('feedbackBtn'),
   version: document.querySelector('.tacta-version')?.textContent,
   scheme: document.documentElement.dataset.tactaTheme
 }));
+if (!pop.state.feedbackBtn) { console.log('popup: Send feedback button missing'); process.exitCode = 1; }
+// Open the gear panel and the feedback form so both get a screenshot at popup width.
+await pop.page.setViewportSize({ width: 400, height: 600 });
+await pop.page.click('#settingsToggle');
+await pop.page.screenshot({ path: path.join(OUT, 'popup-gear.png'), fullPage: true });
+await pop.page.click('#feedbackBtn');
+await pop.page.waitForSelector('.tacta-fb', { timeout: 3000 });
+await pop.page.screenshot({ path: path.join(OUT, 'popup-feedback.png'), fullPage: true });
+console.log('popup gear + feedback screenshots taken');
 
 await context.close();
 console.log('\nscreenshots in', OUT);

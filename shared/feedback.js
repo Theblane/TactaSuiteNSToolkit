@@ -125,26 +125,22 @@
   }
 
   function openTarget(t) {
+    // The service worker opens the tab (and tidies up the blank mailto: tab)
+    // because the popup is destroyed the moment a new tab takes focus.
     return new Promise(function (resolve) {
       try {
-        chrome.tabs.create({ url: t.url }, function (tab) {
-          // A mailto: tab hands off to the mail program and is left blank;
-          // tidy it up so the user is not left staring at an empty tab.
-          if (t.kind === 'mail' && tab && tab.id != null) {
-            setTimeout(function () {
-              try {
-                chrome.tabs.get(tab.id, function (fresh) {
-                  if (chrome.runtime.lastError || !fresh) return;
-                  var u = fresh.url || fresh.pendingUrl || '';
-                  if (!u || u === 'about:blank' || /^mailto:/i.test(u)) chrome.tabs.remove(tab.id, function () { void chrome.runtime.lastError; });
-                });
-              } catch (_) {}
-            }, 1500);
-          }
-          resolve(true);
+        chrome.runtime.sendMessage({ action: 'openFeedbackTarget', url: t.url, kind: t.kind }, function (res) {
+          if (!chrome.runtime.lastError && res && res.success) { resolve(true); return; }
+          fallback();
         });
-      } catch (_) {
-        try { window.open(t.url, '_blank'); resolve(true); } catch (e) { resolve(false); }
+      } catch (_) { fallback(); }
+
+      function fallback() {
+        try {
+          chrome.tabs.create({ url: t.url }, function () { resolve(true); });
+        } catch (_) {
+          try { window.open(t.url, '_blank'); resolve(true); } catch (e) { resolve(false); }
+        }
       }
     });
   }
@@ -160,16 +156,16 @@
       '.tacta-fb{background:var(--tacta-surface,#fff);color:var(--tacta-text,#1a1a1a);border:1px solid var(--tacta-border,#d0d5dd);border-radius:10px;width:100%;max-width:520px;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.25);font-size:13px;line-height:1.5;text-align:left}',
       '.tacta-fb h3{margin:0 0 4px;font-size:16px}',
       '.tacta-fb-sub{margin:0 0 12px;color:var(--tacta-text-muted,#667085);font-size:12px}',
-      '.tacta-fb-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}',
+      '.tacta-fb-row{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}',
       '.tacta-fb-row label{font-weight:600;font-size:12.5px}',
       '.tacta-fb input[type=text],.tacta-fb input[type=email],.tacta-fb textarea,.tacta-fb select{width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--tacta-border,#d0d5dd);border-radius:6px;background:var(--tacta-surface,#fff);color:var(--tacta-text,#1a1a1a);font:inherit}',
-      '.tacta-fb textarea{min-height:110px;resize:vertical}',
+      '.tacta-fb textarea{min-height:84px;resize:vertical}',
       '.tacta-fb-check{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;margin-bottom:6px}',
       '.tacta-fb-check input{margin-top:3px}',
       '.tacta-fb-check span{flex:1}',
       '.tacta-fb-url{display:block;color:var(--tacta-text-muted,#667085);font-size:11px;word-break:break-all}',
-      '.tacta-fb-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}',
-      '.tacta-fb-btn{padding:7px 14px;border-radius:6px;border:1px solid var(--tacta-border,#d0d5dd);background:var(--tacta-surface-2,#f2f4f7);color:var(--tacta-text,#1a1a1a);cursor:pointer;font:inherit;font-weight:600}',
+      '.tacta-fb-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}',
+      '.tacta-fb-btn{padding:6px 11px;border-radius:6px;border:1px solid var(--tacta-border,#d0d5dd);background:var(--tacta-surface-2,#f2f4f7);color:var(--tacta-text,#1a1a1a);cursor:pointer;font:inherit;font-weight:600}',
       '.tacta-fb-btn-primary{background:var(--tacta-accent,#76c043);border-color:var(--tacta-accent,#76c043);color:#fff}',
       '.tacta-fb-btn:disabled{opacity:.5;cursor:default}',
       '.tacta-fb-note{margin:8px 0 0;font-size:11.5px;color:var(--tacta-text-muted,#667085)}',

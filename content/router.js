@@ -83,7 +83,22 @@
       }));
       return;
     }
+    // Reserve the id BEFORE awaiting anything. feature-loader.js runs at the
+    // same time on some pages; without this both loaders pass the has() check,
+    // inject the same files twice and fire featureActivated twice.
+    window.__tactaActivatedFeatures.add(feature.id);
+    try {
+      await injectFeature(feature);
+    } catch (err) {
+      window.__tactaActivatedFeatures.delete(feature.id);
+      throw err;
+    }
+    window.dispatchEvent(new CustomEvent('tacta:featureActivated', {
+      detail: { featureId: feature.id, data: data }
+    }));
+  }
 
+  async function injectFeature(feature) {
     // Inject CSS.
     // Logic: If the CSS file is meant to style the NetSuite page itself,
     // it MUST go into the document head. If it's for toolkit UI, it goes into Shadow Root.
@@ -149,11 +164,6 @@
       js: feature.contentScripts || [],
       injectScripts: feature.injectScripts || []
     });
-
-    window.__tactaActivatedFeatures.add(feature.id);
-    window.dispatchEvent(new CustomEvent('tacta:featureActivated', {
-      detail: { featureId: feature.id, data: data }
-    }));
   }
 
   onReady(async function () {
