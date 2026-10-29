@@ -112,17 +112,21 @@
             '<div class="tacta-br-sub">' +
               '<p>Open <strong>Command Prompt</strong> (press the Windows key, type <code>cmd</code>, press Enter) and run:</p>' +
               '<pre class="tacta-br-cmd">where node</pre>' +
-              '<p>If it prints a path such as <code>C:\\Program Files\\nodejs\\node.exe</code>, Node is installed. Copy that path, you will need it in step 5. ' +
+              '<p>If it prints a path such as <code>C:\\Program Files\\nodejs\\node.exe</code>, Node is installed and you can skip to step 2. ' +
                 'If it says <em>INFO: Could not find files</em>, install Node:</p>' +
-              '<ul>' +
-                '<li><strong>You can install programs on this PC:</strong> run <pre class="tacta-br-cmd">winget install OpenJS.NodeJS.LTS</pre></li>' +
-                '<li><strong>You are not an administrator:</strong> try a per-user install: <pre class="tacta-br-cmd">winget install OpenJS.NodeJS.LTS --scope user</pre> ' +
-                  'If winget answers that the installer does not support user scope, download the <strong>Windows Binary (.zip)</strong> from ' +
-                  '<a href="' + NODE_DL_URL + '" target="_blank" rel="noreferrer">nodejs.org/en/download</a>, right-click it, choose <em>Extract All</em>, ' +
-                  'and extract to <code>C:\\Users\\YOURNAME\\nodejs</code>. No admin rights needed. Node is then at <code>C:\\Users\\YOURNAME\\nodejs\\node.exe</code>.</li>' +
-              '</ul>' +
-              '<p>Close and reopen Command Prompt, run <code>where node</code> again, and copy the path it prints. ' +
-                'If it still prints nothing (common with the .zip method), use the full path to <code>node.exe</code> from the folder you extracted to.</p>' +
+              '<p><strong>You can install programs on this PC (you get the admin prompt and can approve it):</strong></p>' +
+              '<pre class="tacta-br-cmd">winget install OpenJS.NodeJS.LTS</pre>' +
+              '<p><strong>You are not an administrator:</strong> use the standalone .zip, which needs no installer and no admin rights.</p>' +
+              '<ol class="tacta-br-substeps">' +
+                '<li>Go to <a href="' + NODE_DL_URL + '" target="_blank" rel="noreferrer">nodejs.org/en/download</a>. Make sure <strong>Windows</strong> is selected, then download the <strong>Standalone Binary (.zip)</strong>, 64-bit. Do <strong>not</strong> download the .msi installer.</li>' +
+                '<li>Right-click the downloaded .zip, choose <strong>Extract All</strong>, and extract to a folder you own, for example <code>C:\\Users\\YOURNAME\\Documents\\nodejs</code>. ' +
+                  'Open that folder and find <code>node.exe</code>. It may be one level down, in a folder named like <code>node-v26.13.0-win-x64</code>. Copy the address of the folder that contains <code>node.exe</code> from the address bar.</li>' +
+                '<li>Add that folder to your own PATH (no admin needed): press <strong>Windows key + R</strong>, type <code>rundll32 sysdm.cpl,EditEnvironmentVariables</code> and press Enter. ' +
+                  'In the top section, <em>User variables</em>, click <strong>Path</strong>, then <strong>Edit</strong>, then <strong>New</strong>, paste the folder address, and click <strong>OK</strong> on every window.</li>' +
+                '<li>Open a <strong>new</strong> Command Prompt and run <code>node -v</code>. It should print a version number such as <code>v26.13.0</code>.</li>' +
+              '</ol>' +
+              '<p class="tacta-br-hint">If <code>node -v</code> still says not recognized, the PATH entry points to the wrong folder; it must be the folder that contains <code>node.exe</code>. ' +
+                'You can also skip PATH entirely and paste the full path to <code>node.exe</code> in step 3 below. Either way, fully quit and reopen Claude Desktop afterwards so it sees the change.</p>' +
             '</div>' +
           '</li>' +
 
@@ -160,12 +164,12 @@
             '<div class="tacta-br-sub">' +
               '<ol class="tacta-br-substeps">' +
                 '<li>Open <strong>Claude Desktop</strong>. Click the menu button (three lines) in the top-left corner.</li>' +
-                '<li>Choose <strong>Help</strong>, then <strong>Enable Developer Mode</strong>. You only do this once. If you do not see it, you may already have it on.</li>' +
-                '<li>Open the same menu again, choose <strong>File</strong>, then <strong>Settings</strong> (or press <code>Ctrl</code> + <code>,</code>).</li>' +
-                '<li>Click the <strong>Developer</strong> tab, then <strong>Edit Config</strong>. A folder opens with <code>claude_desktop_config.json</code> selected.</li>' +
-                '<li>Right-click that file, choose <strong>Open with</strong>, then <strong>Notepad</strong>.</li>' +
+                '<li>Choose <strong>Developer</strong>, then <strong>Open App Config File</strong>. The file <code>claude_desktop_config.json</code> opens in your text editor, or its folder opens with the file selected.</li>' +
+                '<li>No <strong>Developer</strong> entry in the menu? Choose <strong>Help</strong>, then <strong>Enable Developer Mode</strong>, and look again. ' +
+                  'Older versions instead use <strong>File</strong>, <strong>Settings</strong>, the <strong>Developer</strong> tab, then the <strong>Edit Config</strong> button.</li>' +
+                '<li>If only the folder opened, right-click the file, choose <strong>Open with</strong>, then <strong>Notepad</strong>.</li>' +
               '</ol>' +
-              '<p class="tacta-br-hint">If the folder does not open, press Windows key + R, paste <code>%APPDATA%\\Claude</code> and press Enter. ' +
+              '<p class="tacta-br-hint">If nothing opens, press Windows key + R, paste <code>%APPDATA%\\Claude</code> and press Enter, and open <code>claude_desktop_config.json</code> from there. ' +
                 'On a Mac the file is at <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>.</p>' +
             '</div>' +
           '</li>' +
@@ -192,7 +196,7 @@
 
               '<p><strong>Check the two paths.</strong> <code>"command"</code> is <code>' + esc(nodeShown) + '</code> and the file path is ' +
                 '<code>' + esc(companionShown) + '</code>. In this file every backslash is written twice (<code>\\\\</code>). ' +
-                'That is correct, do not remove them. If <code>where node</code> printed nothing in step 1, <code>"command"</code> must be the full path to <code>node.exe</code>, not just <code>node</code>.</p>' +
+                'That is correct, do not remove them. If <code>node -v</code> is not recognized in a new Command Prompt, <code>"command"</code> must be the full path to <code>node.exe</code>, not just <code>node</code>.</p>' +
               '<p class="tacta-br-hint">Common mistakes: a missing comma between entries, or an extra comma after the last entry. ' +
                 'Claude Desktop will refuse to start the bridge if the file is not valid. Save the file when done.</p>' +
             '</div>' +
@@ -203,7 +207,7 @@
             '<div class="tacta-br-sub">' +
               '<p>Closing the window is not enough. Right-click the Claude icon in the system tray (bottom-right, near the clock, maybe under the <code>^</code> arrow) and choose <strong>Quit</strong>. Open Claude Desktop again.</p>' +
               '<p>Open a NetSuite tab in Chrome and sign in. Come back here and switch on <strong>Bridge is on</strong> below. ' +
-                'Within a few seconds the status shows <strong>Connected</strong>. In Claude Desktop, the tools appear under the connectors icon in the chat box, named <code>netsuite-tactasuite</code>.</p>' +
+                'Within a few seconds the status shows <strong>Connected</strong>. In Claude Desktop, click the <strong>+</strong> (Add files, connectors, and more) in the chat box, then <strong>Connectors</strong>: <code>netsuite-tactasuite</code> is listed there. Ask Claude something like "what NetSuite page do I have open?" to try it.</p>' +
             '</div>' +
           '</li>' +
         '</ol>' +
@@ -288,7 +292,7 @@
 
         '<p class="tacta-br-p"><strong>If that test fails:</strong></p>' +
         '<ul class="tacta-br-list">' +
-          '<li><em>\'node\' is not recognized</em>: Node is not on your PATH. Use the full path to <code>node.exe</code> in quotes instead of <code>node</code>, and put that same full path in <code>"command"</code> in the Claude config.</li>' +
+          '<li><em>\'node\' is not recognized</em>: Node is not on your PATH. Either add its folder to your user PATH (step 1 above) and fully restart Claude Desktop, or use the full path to <code>node.exe</code> in quotes instead of <code>node</code> here and in <code>"command"</code> in the Claude config.</li>' +
           '<li><em>Cannot find module</em>: the path to <code>tacta-bridge.mjs</code> is wrong. Shift + right-click the file and choose <em>Copy as path</em>.</li>' +
           '<li><em>could not listen on 127.0.0.1:' + esc(port) + '</em>: another program owns that port. Change <strong>Local port</strong> above and in the Claude config, then restart Claude Desktop.</li>' +
         '</ul>' +

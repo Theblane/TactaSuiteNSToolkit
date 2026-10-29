@@ -42,27 +42,39 @@ Open **Command Prompt** (Windows key, type `cmd`, Enter) and run:
 where node
 ```
 
-If it prints a path such as `C:\Program Files\nodejs\node.exe`, you have Node.
-Keep that path for step 5. If it prints `INFO: Could not find files`, install
-Node:
+If it prints a path such as `C:\Program Files\nodejs\node.exe`, you have Node
+and can skip to step 2. If it prints `INFO: Could not find files`, install
+Node.
 
-- **You can install programs on this PC:**
-  ```
-  winget install OpenJS.NodeJS.LTS
-  ```
-- **You are not an administrator:** try a per-user install first:
-  ```
-  winget install OpenJS.NodeJS.LTS --scope user
-  ```
-  If winget answers that the installer does not support user scope, download
-  the **Windows Binary (.zip)** from <https://nodejs.org/en/download>,
-  right-click it, choose **Extract All**, and extract to
-  `C:\Users\YOURNAME\nodejs`. No admin rights needed. Node is then at
-  `C:\Users\YOURNAME\nodejs\node.exe`.
+**You can install programs on this PC** (you get the admin prompt and can
+approve it):
 
-Close and reopen Command Prompt and run `where node` again. If it still prints
-nothing (common with the .zip method), you will use the full path to
-`node.exe` instead of the word `node` in step 5.
+```
+winget install OpenJS.NodeJS.LTS
+```
+
+**You are not an administrator:** use the standalone .zip. It needs no
+installer and no admin rights.
+
+1. Go to <https://nodejs.org/en/download>. Make sure **Windows** is selected,
+   then download the **Standalone Binary (.zip)**, 64-bit. Do **not** download
+   the .msi installer.
+2. Right-click the downloaded .zip, choose **Extract All**, and extract to a
+   folder you own, for example `C:\Users\YOURNAME\Documents\nodejs`. Open that
+   folder and find `node.exe`. It may be one level down, in a folder named
+   like `node-v26.13.0-win-x64`. Copy the address of the folder that contains
+   `node.exe` from the Explorer address bar.
+3. Add that folder to your own PATH (no admin needed): press **Windows key +
+   R**, type `rundll32 sysdm.cpl,EditEnvironmentVariables` and press Enter.
+   In the top section, *User variables*, click **Path**, then **Edit**, then
+   **New**, paste the folder address, and click **OK** on every window.
+4. Open a **new** Command Prompt and run `node -v`. It should print a version
+   number such as `v26.13.0`.
+
+If `node -v` still says not recognized, the PATH entry points to the wrong
+folder; it must be the folder that contains `node.exe`. You can also skip PATH
+entirely and use the full path to `node.exe` as `"command"` in step 5. Either
+way, fully quit and reopen Claude Desktop afterwards so it sees the change.
 
 ### 2. Download the companion file
 
@@ -91,16 +103,17 @@ Desktop Bridge**.
 
 1. Open **Claude Desktop**. Click the menu button (three lines) in the
    top-left corner.
-2. Choose **Help**, then **Enable Developer Mode**. You only do this once. If
-   you do not see it, it may already be on.
-3. Open the menu again, choose **File**, then **Settings** (or press
-   `Ctrl` + `,`).
-4. Click the **Developer** tab, then **Edit Config**. A folder opens with
-   `claude_desktop_config.json` selected.
-5. Right-click the file, **Open with**, **Notepad**.
+2. Choose **Developer**, then **Open App Config File**. The file
+   `claude_desktop_config.json` opens in your text editor, or its folder opens
+   with the file selected.
+3. No **Developer** entry in the menu? Choose **Help**, then **Enable
+   Developer Mode**, and look again. Older versions instead use **File**,
+   **Settings**, the **Developer** tab, then the **Edit Config** button (this
+   is the path in the official MCP quickstart).
+4. If only the folder opened, right-click the file, **Open with**, **Notepad**.
 
-If the folder does not open, press Windows key + R, paste `%APPDATA%\Claude`
-and press Enter. On a Mac the file is
+If nothing opens, press Windows key + R, paste `%APPDATA%\Claude`, press
+Enter, and open `claude_desktop_config.json` from there. On a Mac the file is
 `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
 ### 5. Add the bridge to that file
@@ -164,7 +177,7 @@ press Enter, and paste only this entry:
 
 Then check the two paths:
 
-- `"command"` is `node` **only if** `where node` printed a path in step 1.
+- `"command"` is `node` **only if** `node -v` works in a new Command Prompt.
   Otherwise it must be the full path to `node.exe`, for example
   `"C:\\Users\\YOURNAME\\nodejs\\node.exe"`.
 - `"args"` is the full path to `tacta-bridge.mjs`.
@@ -183,8 +196,9 @@ tray (bottom-right, near the clock, maybe under the `^` arrow) and choose
 
 Open a NetSuite tab in Chrome and sign in. In the extension card switch on
 **Bridge is on**. Within a few seconds the status shows **Connected**. In
-Claude Desktop the tools appear under the connectors icon in the chat box,
-named `netsuite-tactasuite`.
+Claude Desktop click the **+** (Add files, connectors, and more) in the chat
+box, then **Connectors**: `netsuite-tactasuite` is listed there. Ask Claude
+"what NetSuite page do I have open?" to try it.
 
 ## Settings in the extension card
 
@@ -220,9 +234,9 @@ This proves Node and the file work, separately from Claude Desktop.
 
 **If that test fails**
 
-- `'node' is not recognized`: Node is not on your PATH. Use the full path to
-  `node.exe` in quotes instead of `node`, and put that same full path in
-  `"command"` in the Claude config.
+- `'node' is not recognized`: Node is not on your PATH. Either add its folder to your user PATH (step 1)
+  and fully restart Claude Desktop, or use the full path to `node.exe` in
+  quotes instead of `node` here and in `"command"` in the Claude config.
 - `Cannot find module`: the path to `tacta-bridge.mjs` is wrong. Shift +
   right-click the file and choose **Copy as path**.
 - `could not listen on 127.0.0.1:8787`: another program owns that port. Change

@@ -22,7 +22,7 @@
     // Where the in-extension "Send feedback" form addresses its email. Leave
     // empty to fall back to opening a prefilled GitHub issue instead. The
     // extension never sends mail itself; see shared/feedback.js.
-    feedbackEmail: '',
+    feedbackEmail: 'blane.maher@gmail.com',
     links: [
       { id: 'github',   label: 'Source on GitHub', short: 'GitHub',   url: 'https://github.com/Theblane/TactaSuiteNSToolkit' },
       { id: 'website',  label: 'blanemaher.com',   short: 'Website',  url: 'https://blanemaher.com' },
