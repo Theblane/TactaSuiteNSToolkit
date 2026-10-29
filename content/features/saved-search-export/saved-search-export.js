@@ -76,18 +76,47 @@
      * .uir-list-headerrow elements.
      * @returns {HTMLTableElement|null}
      */
+    /**
+     * True when the page is the Saved Search editor (search.nl) rather than a
+     * results or list page. The editor's Criteria / Results subtabs are
+     * NetSuite "machine" tables that look like list tables; putting the export
+     * toolbar inside one breaks NetSuite's own field validation.
+     */
+    function _isSearchEditor() {
+        var info = window.__tactaPageInfo;
+        if (info && info.type) return info.type === 'search-edit';
+        return /\/app\/common\/search\/search\.nl/i.test(window.location.pathname + window.location.search);
+    }
+
+    /**
+     * True when a table is part of a NetSuite machine (sublist editor), which
+     * is never a results table even though it reuses listheadertd markup.
+     */
+    function _isMachineTable(table) {
+        if (!table) return false;
+        if (table.closest('.uir-machine-table-container, [id$="_splits"]')) return true;
+        return !!table.querySelector('.uir-machine-headerrow, .uir-machine-row-focused, .uir-machine-row-unfocused');
+    }
+
+    /** Wraps a candidate so machine tables are never accepted. */
+    function _acceptTable(table) {
+        return table && !_isMachineTable(table) ? table : null;
+    }
+
     function _findResultsTable() {
+        if (_isSearchEditor()) return null;
+
         // Strategy 1: Look for a table containing a header row
         var headerRow = document.querySelector(HEADER_ROW_SELECTOR);
         if (headerRow) {
-            var table = headerRow.closest('table');
+            var table = _acceptTable(headerRow.closest('table'));
             if (table) return table;
         }
 
         // Strategy 2: Look for rows with listheadertd class
         var headerCell = document.querySelector('td.listheadertd, th.listheadertd');
         if (headerCell) {
-            var tbl = headerCell.closest('table');
+            var tbl = _acceptTable(headerCell.closest('table'));
             if (tbl) return tbl;
         }
 
@@ -96,13 +125,13 @@
         for (var i = 0; i < tables.length; i++) {
             // Verify it has data rows (not just a layout table)
             var rows = tables[i].querySelectorAll(DATA_ROW_SELECTOR);
-            if (rows.length > 0) return tables[i];
+            if (rows.length > 0 && !_isMachineTable(tables[i])) return tables[i];
         }
 
         // Strategy 4: Any table with listheadertd cells
         var allTables = document.querySelectorAll('table');
         for (var j = 0; j < allTables.length; j++) {
-            if (allTables[j].querySelector('.listheadertd')) {
+            if (allTables[j].querySelector('.listheadertd') && !_isMachineTable(allTables[j])) {
                 return allTables[j];
             }
         }
@@ -701,6 +730,7 @@
      */
     function _createButton(label, iconSvg, title, onClick) {
         var btn = document.createElement('button');
+        btn.type = 'button'; // never submit NetSuite's main_form
         btn.className = 'tacta-sse-btn';
         btn.title = title;
         btn.innerHTML = iconSvg + '<span class="tacta-sse-btn-label">' + label + '</span>';

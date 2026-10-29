@@ -19,6 +19,10 @@
   var AUTHOR = {
     name: 'Blane Maher',
     role: 'ERP team lead, built for NetSuite admins and developers',
+    // Where the in-extension "Send feedback" form addresses its email. Leave
+    // empty to fall back to opening a prefilled GitHub issue instead. The
+    // extension never sends mail itself; see shared/feedback.js.
+    feedbackEmail: '',
     links: [
       { id: 'github',   label: 'Source on GitHub', short: 'GitHub',   url: 'https://github.com/Theblane/TactaSuiteNSToolkit' },
       { id: 'website',  label: 'blanemaher.com',   short: 'Website',  url: 'https://blanemaher.com' },

@@ -63,7 +63,7 @@ Single-purpose statements that mention "and 30+ productivity tools" or read like
 > • Navigation Search - keyboard-driven fuzzy search across menu items (Ctrl+Shift+K); paste a script or record id to open it.
 > • Portlet auto-refresh, Dataset to SuiteQL, CSV Template Generator, Search URL Builder, PDF Template Tools, CSV Import Viewer, Workflow Colors, Better Page Titles.
 >
-> **Optional: Claude Desktop bridge**
+> **Beta feature: Claude Desktop Bridge (off by default)**
 > An off-by-default feature lets a desktop MCP client you run (such as Claude Desktop) query your live NetSuite session through the extension, using your signed-in browser tab. No NetSuite setup, no OAuth, no role switch. It connects only to a small companion program on your own computer over `127.0.0.1`, is read-only by default, and never contacts the developer or any third party. Leave it off and the extension makes no network calls at all.
 >
 > **Privacy first**
@@ -102,7 +102,7 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 ### `alarms`
 
-> Runs a periodic reconnect check (once per minute) for the optional Claude Desktop bridge, so that if the local companion is started after the service worker went idle, the extension reconnects to it. Used for nothing else. If the bridge is left disabled, the alarm simply does nothing.
+> Runs a periodic reconnect check (once per minute) for the Claude Desktop Bridge beta feature, so that if the local companion is started after the service worker went idle, the extension reconnects to it. Used for nothing else. If the bridge is left disabled, the alarm simply does nothing.
 
 ### Host permission: `https://*.netsuite.com/*`
 
@@ -110,7 +110,7 @@ Paste each into the matching field on the CWS **Privacy practices** tab.
 
 ### Optional host permission: `http://127.0.0.1/*`
 
-> Not granted at install time. Requested only if the user enables the optional Claude Desktop bridge, and used only to connect to a companion program on the user's own machine over loopback (`127.0.0.1`). The extension never connects to any remote `http://` origin; this permission exists solely for the local, user-initiated bridge.
+> Not granted at install time. Requested only if the user enables the Claude Desktop Bridge beta feature, and used only to connect to a companion program on the user's own machine over loopback (`127.0.0.1`). The extension never connects to any remote `http://` origin; this permission exists solely for the local, user-initiated bridge.
 
 ---
 
@@ -136,7 +136,7 @@ For each item below, check **"I do not collect this"** unless noted otherwise.
 | Location | Not collected | |
 | Web history | Not collected | The extension's content scripts run only on `*.netsuite.com` - no other browsing data is read. |
 | User activity | Not collected | No clickstream or interaction logging is captured or sent. |
-| Website content | Not collected | DOM is read inside NetSuite pages purely to render features locally. Nothing is uploaded to any remote server. If the user enables the optional Claude Desktop bridge, NetSuite query/record data is passed to a companion on the user's own machine (loopback `127.0.0.1`) and on to the user's own MCP client; it is not transmitted off-device by the extension. |
+| Website content | Not collected | DOM is read inside NetSuite pages purely to render features locally. Nothing is uploaded to any remote server. If the user enables the Claude Desktop Bridge beta feature, NetSuite query/record data is passed to a companion on the user's own machine (loopback `127.0.0.1`) and on to the user's own MCP client; it is not transmitted off-device by the extension. |
 
 Also affirm:
 - ☑ I do not sell or transfer user data to third parties.

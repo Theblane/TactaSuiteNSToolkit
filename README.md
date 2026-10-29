@@ -79,6 +79,7 @@ Source: [github.com/Theblane/TactaSuiteNSToolkit](https://github.com/Theblane/Ta
 - Quick Action buttons in the popup open the most common tools (Fields, Record, Scripts, SuiteQL).
 - Right-click on a NetSuite page for context menu actions (e.g., Split View).
 - For full feature management, theme settings, account color settings, and Quick Search type selection, open **Options** from the popup footer.
+- Found a problem or have an idea? **Send feedback** in the popup gear panel (or the About section of Options) opens a short form, then hands the message to your own email program or a GitHub issue. Nothing is sent without you pressing Send there.
 
 ### User Types
 
@@ -100,13 +101,15 @@ The extension requests only what it needs to operate inside NetSuite:
 | `scripting` | Inject content scripts on demand for popup-triggered features (e.g., Field Explorer). |
 | `declarativeContent` | Show the extension action icon only on `*.netsuite.com` pages. |
 | `contextMenus` | Right-click menu entries (e.g., Split View). |
-| `alarms` | Periodic reconnect heartbeat for the optional Claude Desktop bridge (does nothing if the bridge is off). |
+| `alarms` | Periodic reconnect heartbeat for the Claude Desktop Bridge beta feature (does nothing if the bridge is off). |
 | Host: `https://*.netsuite.com/*`, `https://*.oracle.com/*` | NetSuite uses per-account subdomains (`<accountid>.app.netsuite.com`), so wildcard host access is required. |
 | Optional host: `http://127.0.0.1/*` | Not granted at install. Requested only if you enable the Claude Desktop bridge; used solely to reach the local companion over loopback. |
 
-## Optional: Claude Desktop bridge
+## Beta feature: Claude Desktop Bridge (off by default)
 
 The extension can act as a bridge so a desktop MCP client you run (such as Claude Desktop) can query your **live** NetSuite session through your signed-in browser tab - no NetSuite setup, no OAuth, no role switch. It is **off by default**. When enabled, the extension connects out to a small, zero-dependency companion on your own machine over `127.0.0.1`; read-only (SuiteQL `SELECT`/`WITH`) by default. See [`companion/README.md`](./companion/README.md) for setup and [PRIVACY.md](./PRIVACY.md) for what it does and does not send.
+
+Setup is walked through step by step in the Options card (install Node.js, download the companion, edit the Claude Desktop config) and in [companion/README.md](./companion/README.md). A **Sandbox only** switch restricts the bridge to sandbox tabs. Claude acts with the permissions of the role you are signed in as; it cannot see more than you can.
 
 ## Privacy
 

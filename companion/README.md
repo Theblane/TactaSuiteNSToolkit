@@ -1,117 +1,330 @@
-# TactaSuite NetSuite Bridge (local companion)
+# Claude Desktop Bridge companion (beta feature)
 
-This small, zero-dependency Node program lets a desktop MCP client (such as
-Claude Desktop) query your **live** NetSuite instance through the NetSuite
-TactaSuite Chrome extension, using your already signed-in browser session.
+`tacta-bridge.mjs` is a small helper program that lets the **Claude Desktop**
+app read from the NetSuite account you already have open in Chrome, through
+the TactaSuite NS Toolkit extension. You ask Claude a question in plain
+English, and it looks up the answer in your NetSuite tab, as you, with your
+role and permissions.
 
-- No NetSuite-side setup. No integration record, no RESTlet, no OAuth.
-- No role switch. It uses whatever role your browser tab is in.
-- Read-only by default. Only `SELECT` / `WITH` SuiteQL is allowed unless you
-  turn on "Allow write queries" in the extension settings.
-- Local only. The companion listens on `127.0.0.1` and is reachable only by
-  processes on your own machine, and only with the pairing token.
+- **Nothing to set up in NetSuite.** No integration record, no token, no admin.
+- **Read only.** Claude can look at data but cannot change it. SuiteQL, the
+  query language it uses, cannot modify records.
+- **Stays on your computer.** The companion and the extension only talk to each
+  other on your own PC (`127.0.0.1`). Nothing is sent to the author or to any
+  website. What Claude reads does become part of your Claude conversation.
+- **Off until you switch it on**, and you can switch it off at any time.
+- **Beta.** Expect rough edges. Read the questions at the end before using it
+  with sensitive data.
 
 ## How it works
 
 ```
-Claude Desktop  --stdio/MCP-->  tacta-bridge.mjs  --loopback WS-->  TactaSuite extension  -->  your NetSuite tab
+Claude Desktop  -->  tacta-bridge.mjs (companion)  -->  TactaSuite extension  -->  your NetSuite tab
 ```
 
-Claude Desktop launches `tacta-bridge.mjs` and talks to it over MCP (stdio).
-The companion also runs a loopback WebSocket server; the extension's service
-worker connects out to it. When Claude calls a tool, the companion forwards it
-to the extension, which runs it in your NetSuite tab and returns the result.
+Claude Desktop starts the companion when it opens and stops it when you quit.
+The extension connects to the companion on your PC. When Claude needs
+something from NetSuite, the request goes companion, extension, NetSuite tab,
+and the answer comes back the same way.
 
-The extension dials out to the companion (rather than the reverse) because an
-extension cannot run a server, and an open WebSocket keeps the extension's
-Manifest V3 service worker alive.
+## Setup (once, about 10 minutes)
 
-## Multiple Claude Desktop sessions
+The in-extension card has the same steps with your real paths and token
+filled in: Chrome, extension icon, **All settings**, **Claude Desktop Bridge**.
 
-Claude Desktop may launch the companion more than once (for example one copy
-for regular chats and another for Cowork or Code sessions). Only one copy can
-own the loopback port, so the first one to bind it becomes the primary and
-talks to the extension. Any later copy connects to the primary as a relay and
-forwards its tool calls through it. If the primary exits, a secondary takes
-over the port and the extension reconnects on its normal retry cycle. All
-copies must use the same `TACTA_BRIDGE_TOKEN`.
+### 1. Check for Node.js, or install it
 
-## Install
+Node.js is the free program that runs the companion.
 
-1. Install [Node.js](https://nodejs.org) 18 or newer.
-2. Download `tacta-bridge.mjs` and save it somewhere stable on your PC (there is
-   nothing to `npm install` - it has no dependencies). Get it from the
-   [latest release](https://github.com/Theblane/TactaSuiteNSToolkit/releases/latest/download/tacta-bridge.mjs),
-   or use the **Download the companion** button in the extension's bridge
-   settings card.
-3. In the extension, open **Options -> Claude Desktop bridge**:
-   - Click **Generate** to create a pairing token.
-   - Click **Grant local access** (approves the `127.0.0.1` connection).
-   - Copy the generated Claude Desktop config block.
-4. Paste the block into your Claude Desktop config file and fix the path to
-   `tacta-bridge.mjs`:
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-5. Restart Claude Desktop. Open your NetSuite tab. Enable the bridge toggle in
-   the extension. The status turns **Connected**.
+Open **Command Prompt** (Windows key, type `cmd`, Enter) and run:
 
-Example config:
+```
+where node
+```
+
+If it prints a path such as `C:\Program Files\nodejs\node.exe`, you have Node.
+Keep that path for step 5. If it prints `INFO: Could not find files`, install
+Node:
+
+- **You can install programs on this PC:**
+  ```
+  winget install OpenJS.NodeJS.LTS
+  ```
+- **You are not an administrator:** try a per-user install first:
+  ```
+  winget install OpenJS.NodeJS.LTS --scope user
+  ```
+  If winget answers that the installer does not support user scope, download
+  the **Windows Binary (.zip)** from <https://nodejs.org/en/download>,
+  right-click it, choose **Extract All**, and extract to
+  `C:\Users\YOURNAME\nodejs`. No admin rights needed. Node is then at
+  `C:\Users\YOURNAME\nodejs\node.exe`.
+
+Close and reopen Command Prompt and run `where node` again. If it still prints
+nothing (common with the .zip method), you will use the full path to
+`node.exe` instead of the word `node` in step 5.
+
+### 2. Download the companion file
+
+Download
+[`tacta-bridge.mjs`](https://github.com/Theblane/TactaSuiteNSToolkit/releases/latest/download/tacta-bridge.mjs)
+(or use **Download tacta-bridge.mjs** in the extension card). It is one small
+file with no dependencies; there is nothing to install.
+
+Move it out of Downloads into a folder that will not change, for example
+`C:\Users\YOURNAME\TactaSuite\`. Copy its full path: hold **Shift**,
+right-click the file, choose **Copy as path**.
+
+### 3. Create your pairing token in the extension
+
+In Chrome open the extension's **All settings** page and scroll to **Claude
+Desktop Bridge**.
+
+1. Paste the two paths from steps 1 and 2 into the boxes in step 3 of the
+   card. The config blocks below are built from them with the slashes
+   formatted correctly.
+2. Click **Generate** to create a pairing token. This is a password that only
+   the extension and your companion know. Keep it private.
+3. Click **Allow local connection** and accept the Chrome prompt.
+
+### 4. Open the Claude Desktop config file
+
+1. Open **Claude Desktop**. Click the menu button (three lines) in the
+   top-left corner.
+2. Choose **Help**, then **Enable Developer Mode**. You only do this once. If
+   you do not see it, it may already be on.
+3. Open the menu again, choose **File**, then **Settings** (or press
+   `Ctrl` + `,`).
+4. Click the **Developer** tab, then **Edit Config**. A folder opens with
+   `claude_desktop_config.json` selected.
+5. Right-click the file, **Open with**, **Notepad**.
+
+If the folder does not open, press Windows key + R, paste `%APPDATA%\Claude`
+and press Enter. On a Mac the file is
+`~/Library/Application Support/Claude/claude_desktop_config.json`.
+
+### 5. Add the bridge to that file
+
+Look at what is already in the file and pick the matching case. The extension
+card shows these blocks with your real token, extension ID and paths; copy
+them from there.
+
+**A. The file is empty, or only contains `{}`.** Delete everything and paste
+the whole block:
 
 ```json
 {
   "mcpServers": {
     "netsuite-tactasuite": {
       "command": "node",
-      "args": ["C:\\path\\to\\companion\\tacta-bridge.mjs"],
+      "args": ["C:\\Users\\YOURNAME\\TactaSuite\\tacta-bridge.mjs"],
       "env": {
-        "TACTA_BRIDGE_TOKEN": "<token from the extension>",
+        "TACTA_BRIDGE_TOKEN": "paste the token from the extension",
         "TACTA_BRIDGE_PORT": "8787",
-        "TACTA_BRIDGE_EXT_ID": "<extension id from the extension>"
+        "TACTA_BRIDGE_EXT_ID": "paste the extension ID from the extension"
       }
     }
   }
 }
 ```
 
-## Environment variables
+**B. The file has text but no `"mcpServers"` line.** Find the last `}` at the
+very bottom. Just above it, add a comma to the end of the previous line, press
+Enter, and paste:
+
+```json
+  "mcpServers": {
+    "netsuite-tactasuite": {
+      "command": "node",
+      "args": ["C:\\Users\\YOURNAME\\TactaSuite\\tacta-bridge.mjs"],
+      "env": {
+        "TACTA_BRIDGE_TOKEN": "paste the token from the extension",
+        "TACTA_BRIDGE_PORT": "8787",
+        "TACTA_BRIDGE_EXT_ID": "paste the extension ID from the extension"
+      }
+    }
+  }
+```
+
+**C. The file already has `"mcpServers": {` with other servers inside.** Find
+the last server entry inside `mcpServers`. Add a comma after its closing `}`,
+press Enter, and paste only this entry:
+
+```json
+    "netsuite-tactasuite": {
+      "command": "node",
+      "args": ["C:\\Users\\YOURNAME\\TactaSuite\\tacta-bridge.mjs"],
+      "env": {
+        "TACTA_BRIDGE_TOKEN": "paste the token from the extension",
+        "TACTA_BRIDGE_PORT": "8787",
+        "TACTA_BRIDGE_EXT_ID": "paste the extension ID from the extension"
+      }
+    }
+```
+
+Then check the two paths:
+
+- `"command"` is `node` **only if** `where node` printed a path in step 1.
+  Otherwise it must be the full path to `node.exe`, for example
+  `"C:\\Users\\YOURNAME\\nodejs\\node.exe"`.
+- `"args"` is the full path to `tacta-bridge.mjs`.
+- In this file every backslash is written twice (`\\`). That is correct, do
+  not remove them. Forward slashes also work: `C:/Users/YOURNAME/TactaSuite/tacta-bridge.mjs`.
+
+Common mistakes: a missing comma between entries, or an extra comma after the
+last entry. Claude Desktop refuses to start the bridge if the file is not
+valid JSON. Paste the whole file into <https://jsonlint.com> if unsure. Save.
+
+### 6. Restart Claude Desktop and switch the bridge on
+
+Closing the window is not enough. Right-click the Claude icon in the system
+tray (bottom-right, near the clock, maybe under the `^` arrow) and choose
+**Quit**. Open Claude Desktop again.
+
+Open a NetSuite tab in Chrome and sign in. In the extension card switch on
+**Bridge is on**. Within a few seconds the status shows **Connected**. In
+Claude Desktop the tools appear under the connectors icon in the chat box,
+named `netsuite-tactasuite`.
+
+## Settings in the extension card
+
+| Setting | What it does |
+|---|---|
+| **Bridge is on** | The master switch. Off means Claude cannot reach NetSuite at all. |
+| **Pairing token** | The shared password. Generating a new one means updating the Claude config and restarting Claude Desktop. |
+| **Local port** | Leave at 8787 unless another program uses it. Must match `TACTA_BRIDGE_PORT`. |
+| **Sandbox only** | When on, Claude can only use sandbox tabs. Production tabs are ignored even if you are looking at one. |
+| **Allow write actions** | Off by default. In this beta there are no tools that can change NetSuite data, so it does nothing yet. **If you turn it on, any change Claude makes in NetSuite is your responsibility. This is a beta feature driven by AI. The author is not responsible for any data changes, errors or losses. Use at your own risk.** |
+
+## Not connecting? Test it yourself
+
+This proves Node and the file work, separately from Claude Desktop.
+
+1. Fully quit Claude Desktop (system tray, right-click, **Quit**). Otherwise it
+   is already holding port 8787.
+2. Open Command Prompt and run these lines one at a time, with your own token
+   and paths:
+   ```
+   set TACTA_BRIDGE_TOKEN=your-token-from-the-extension
+   set TACTA_BRIDGE_PORT=8787
+   node "C:\Users\YOURNAME\TactaSuite\tacta-bridge.mjs"
+   ```
+3. You should see:
+   ```
+   [tacta-bridge] tacta-bridge 1.1.0 ready (MCP on stdio).
+   [tacta-bridge] loopback bridge listening on 127.0.0.1:8787 (primary, waiting for extension)
+   ```
+   Switch on **Bridge is on** in the extension. The status turns **Connected**
+   and the window prints `extension paired`. Press `Ctrl` + `C` to stop it,
+   then start Claude Desktop again.
+
+**If that test fails**
+
+- `'node' is not recognized`: Node is not on your PATH. Use the full path to
+  `node.exe` in quotes instead of `node`, and put that same full path in
+  `"command"` in the Claude config.
+- `Cannot find module`: the path to `tacta-bridge.mjs` is wrong. Shift +
+  right-click the file and choose **Copy as path**.
+- `could not listen on 127.0.0.1:8787`: another program owns that port. Change
+  **Local port** in the extension and `TACTA_BRIDGE_PORT` in the config, then
+  restart Claude Desktop.
+
+**If the test works but Claude Desktop does not connect**
+
+- The config file has a typo. Missing or extra commas are the usual cause.
+  Check it at <https://jsonlint.com>.
+- The config was copied from another computer. The node path, the file path,
+  the token and the extension ID are all specific to your PC and your Chrome.
+  Use the blocks from your own extension card.
+- Claude Desktop was not fully quit. Quit from the system tray, then reopen.
+- Claude Desktop keeps a log of the bridge at
+  `%APPDATA%\Claude\logs\mcp-server-netsuite-tactasuite.log`. The last lines
+  say what went wrong.
+
+**If Claude says the extension is not connected**
+
+- Open a NetSuite tab and sign in. If **Sandbox only** is on, it must be a
+  sandbox tab.
+- Check that **Bridge is on** is switched on and the status says Connected.
+  The extension retries about once a minute; **Reconnect now** retries at once.
+
+## Questions and answers
+
+**What can Claude do with this?**
+Read only. It can run SuiteQL queries (a read-only query language that cannot
+change records), describe the NetSuite page you have open, list the fields on
+the record you are viewing, and list your open NetSuite tabs. It cannot edit,
+create or delete anything in this beta.
+
+**Which NetSuite accounts can it reach?**
+Any NetSuite tab open in this Chrome profile where you are signed in,
+production and sandbox alike. It uses the tab you are looking at, or the one
+you used most recently. Turn on **Sandbox only** to block production, or close
+your production tabs while you work with Claude.
+
+**What permissions does it have in NetSuite?**
+Exactly yours. It runs inside your signed-in tab with the role you are logged
+in as. It cannot see anything you cannot see.
+
+**When is it active?**
+Only when all three are true: **Bridge is on** in the extension, Claude
+Desktop is running (it starts the companion), and a NetSuite tab is open.
+
+**How do I stop it?**
+Switch off **Bridge is on**. Quitting Claude Desktop also stops the companion.
+To remove it completely, delete the `netsuite-tactasuite` entry from the
+Claude config and delete the companion file.
+
+**Is it safe? Does my data leave my computer?**
+The companion only accepts connections from this computer, and only from this
+extension with your pairing token. The extension never sends anything to the
+author or any website. What Claude reads from NetSuite does become part of
+your Claude conversation, so it is covered by Anthropic's privacy terms, the
+same as anything else you paste into Claude. Do not use it with data you would
+not paste into a chat.
+
+**Does it work with ChatGPT or other AI apps?**
+Not with ChatGPT today. The ChatGPT desktop app cannot start a local program
+like this companion. Any app that can run a local "stdio" MCP server works
+with the same config block, for example Claude Code or Cursor. Only Claude
+Desktop is tested.
+
+**I have several Claude windows or use Cowork. Is that a problem?**
+No. Claude Desktop may start the companion more than once (one copy per chat,
+Cowork or Code surface). The first copy to own the port talks to the
+extension; later copies pass their requests through it. If the first one
+exits, another takes over. All copies must use the same token.
+
+**Why does it need Node.js?**
+Chrome extensions cannot run a program on your PC or accept connections. The
+companion is that small program, and Node.js is what runs it.
+
+## Technical reference
+
+### Environment variables
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `TACTA_BRIDGE_TOKEN` | yes | - | Shared pairing token; must match the extension. |
 | `TACTA_BRIDGE_PORT` | no | `8787` | Loopback port; must match the extension. |
-| `TACTA_BRIDGE_EXT_ID` | no | - | If set, only this chrome extension id may connect. |
+| `TACTA_BRIDGE_EXT_ID` | no | - | If set, only this Chrome extension id may connect. |
 
-## Tools exposed to the MCP client
+### Tools exposed to the MCP client
 
 | Tool | What it does |
 |------|--------------|
 | `netsuite_run_suiteql` | Run a read-only SuiteQL (`SELECT` / `WITH`) query. Paginated to 200k rows. |
-| `netsuite_get_current_page` | Describe the NetSuite page you are viewing (URL, account, record type/id, mode). |
+| `netsuite_get_current_page` | Describe the NetSuite page being viewed (URL, account, record type/id, mode). |
 | `netsuite_get_current_record_fields` | List fields (id, label, type, value) of the record currently open. |
-| `netsuite_list_tabs` | List your open NetSuite browser tabs. |
+| `netsuite_list_tabs` | List the open NetSuite browser tabs the bridge may act on. |
 
-## Security notes
+### Security notes
 
 - The WebSocket server binds `127.0.0.1` only (never `0.0.0.0`).
 - Every connection must present the pairing token and a `chrome-extension://`
   origin. Set `TACTA_BRIDGE_EXT_ID` to pin a single extension id.
-- Keep your token private. Regenerate it in the extension if it leaks (then
-  update this config and restart Claude Desktop).
-- Write queries are off by default. The extension gates them behind an explicit
-  "Allow write queries" toggle.
-
-## Troubleshooting
-
-- **Status stays "Not connected":** make sure the companion is running (Claude
-  Desktop launches it), the port and token match, and a NetSuite tab is open.
-- **"port already in use" by something other than the companion:** set
-  `TACTA_BRIDGE_PORT` to a free port in both the config and the extension
-  settings. A second copy of the companion itself is fine; it relays through
-  the first.
-- **Status stays "Connecting" in Claude Desktop:** the config was copied from
-  another PC. The `command` path to node.exe, the `args` path to
-  `tacta-bridge.mjs`, and the pairing token are all specific to your machine
-  and your browser. Generate your own token in the extension and fix both
-  paths, then check `%APPDATA%\Claude\logs\mcp-server-netsuite-tactasuite.log`.
-- **Tool says the extension is not connected:** open your NetSuite tab and
-  confirm the bridge toggle is on; the extension reconnects within ~1 minute.
+- Relay connections between companion copies carry the same token.
+- Regenerate the token in the extension if it leaks, then update the config
+  and restart Claude Desktop.
+- The extension enforces read-only SuiteQL (`SELECT` / `WITH`, no DML
+  keywords) unless **Allow write actions** is on. No write tools exist yet.

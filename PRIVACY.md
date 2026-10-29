@@ -7,7 +7,7 @@
 
 NetSuite TactaSuite ("the extension") does not collect, transmit, or sell any user data, and never contacts any server controlled by the developer. All settings and state are stored locally on your device. There are no analytics, no telemetry, and no AI feature inside the extension.
 
-By default the extension makes no outbound network calls of any kind. It includes one **optional, off-by-default** feature - the Claude Desktop bridge - that, only when you explicitly enable it, opens a connection to a companion program running on your own computer over the loopback address `127.0.0.1`. See "Optional: Claude Desktop bridge" below. Even then, nothing is sent to the developer or to any third-party server by the extension.
+By default the extension makes no outbound network calls of any kind. It includes one **beta, off-by-default** feature - the Claude Desktop Bridge - that, only when you explicitly enable it, opens a connection to a companion program running on your own computer over the loopback address `127.0.0.1`. See "Optional: Claude Desktop bridge" below. Even then, nothing is sent to the developer or to any third-party server by the extension.
 
 ## What the extension stores
 
@@ -35,27 +35,31 @@ The extension's content scripts run only on `*.netsuite.com` pages, and only to 
 - DOM content of the current NetSuite page (to inspect fields, sublist rows, search results, etc., for the features you have enabled).
 - NetSuite's own JavaScript APIs (`require`, `nlapi*`, `currentRecord`) where applicable, for features such as Field Explorer, Record Object Viewer, SuiteQL Runner, and Saved Search Export.
 
-Unless you enable the optional Claude Desktop bridge (below), this information is processed entirely inside your browser and never transmitted anywhere.
+Unless you enable the Claude Desktop Bridge beta feature (below), this information is processed entirely inside your browser and never transmitted anywhere.
 
-## Optional: Claude Desktop bridge
+## Beta feature: Claude Desktop Bridge (off by default)
 
-The extension includes an optional feature, **off by default**, that lets a desktop MCP client you run (such as Claude Desktop) query your live NetSuite session through the extension. You can see and control it under **Options -> Claude Desktop bridge**.
+The extension includes a beta feature, **off by default**, that lets a desktop MCP client you run (such as Claude Desktop) query your live NetSuite session through the extension. You can see and control it under **Options -> Claude Desktop Bridge**. A **Sandbox only** switch (off by default) restricts it to sandbox tabs.
 
 How it works and what it means for your data:
 
 - The feature does nothing until you turn it on. Turning it on requires you to generate a pairing token and approve an optional permission for `http://127.0.0.1/*` (loopback).
 - When enabled, the extension connects **outbound to your own computer only**, over the loopback address `127.0.0.1`, to a companion program that you install and that your MCP client launches. This connection never leaves your machine and never reaches the developer or any third-party server.
-- Access is **read-only by default**: only `SELECT` / `WITH` SuiteQL queries are allowed. Write queries are possible only if you turn on the explicit "Allow write queries" toggle.
+- Access is **read-only by default**: only `SELECT` / `WITH` SuiteQL queries are allowed. SuiteQL cannot modify records, and no write tools exist in this beta. The "Allow write actions" toggle (off by default) is reserved for future tools and carries an explicit warning.
 - Through the bridge, your MCP client can request NetSuite data (query results, the current page, the current record's fields). That data is returned to the MCP client **you chose to run**. Any onward transmission (for example, your MCP client sending a result to its own model provider) is performed by that client, not by this extension, and is governed by that client's own privacy terms. The extension itself sends nothing beyond your loopback companion.
 - The connection is secured by binding to `127.0.0.1` only, a shared pairing token, and an extension-origin check.
 
 If you never enable this feature, the extension behaves exactly as described elsewhere in this document and makes no outbound network calls.
 
+## Send feedback form
+
+The popup and Options page include a **Send feedback** form. It does not transmit anything itself: when you submit it, it opens your own email program (or a GitHub issue page) with the message filled in, and nothing is sent until you press Send there. You can see and edit the full message first. Including the current NetSuite page address and technical details (extension version, browser version, which features are on) is optional and controlled by checkboxes on the form.
+
 ## What the extension does NOT do
 
 - It does **not** make any network requests to the extension developer, ever.
 - It does **not** make any network requests to third-party analytics, telemetry, error-tracking, or advertising services.
-- It does **not** send your data to any server on the internet. The only outbound connection it can make is to a companion on your own computer (`127.0.0.1`), and only if you enable the optional Claude Desktop bridge.
+- It does **not** send your data to any server on the internet. The only outbound connection it can make is to a companion on your own computer (`127.0.0.1`), and only if you enable the Claude Desktop Bridge beta feature.
 - It does **not** collect personally identifiable information.
 - It does **not** collect, share, or sell browsing history, NetSuite data, or any other user content.
 - It does **not** modify or transmit NetSuite records on its own initiative - every NetSuite write (e.g., saved search creation, field updates from Field Explorer) is initiated by an explicit user action.

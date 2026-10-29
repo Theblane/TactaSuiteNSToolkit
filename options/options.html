@@ -199,15 +199,25 @@
                 </div>
             </section>
 
-            <!-- ── Claude Desktop bridge (optional) ───────────────── -->
+            <!-- ── Claude Desktop Bridge (beta feature, off by default) ── -->
             <section class="tacta-opt-section" id="bridge">
-                <h2 class="tacta-opt-section-title">Claude Desktop bridge <span class="tacta-opt-badge">Optional</span></h2>
+                <h2 class="tacta-opt-section-title">Claude Desktop Bridge <span class="tacta-opt-badge tacta-opt-badge-beta">Beta feature</span></h2>
                 <p class="tacta-opt-section-desc">
-                    Let a desktop MCP client (such as Claude Desktop) query your live
-                    NetSuite instance through this extension, using your signed-in
-                    browser session. No NetSuite setup, no OAuth, no role switch. A
-                    small local companion runs on your PC and talks to the extension
-                    over a loopback connection on 127.0.0.1 only. Read-only by default.
+                    Let the Claude Desktop app read from the NetSuite account you already
+                    have open in Chrome. You can ask Claude questions in plain English,
+                    for example "which sales orders shipped late this month", and it
+                    looks up the answer in your NetSuite tab, as you, with your role and
+                    permissions. Nothing to install in NetSuite, no admin needed.
+                </p>
+                <p class="tacta-opt-section-desc">
+                    It works through a small helper program called the <strong>companion</strong>
+                    that runs on your PC. Claude Desktop starts it and stops it for you.
+                    The companion and this extension only talk to each other on your own
+                    computer; nothing is sent to the author or to any website. It is
+                    <strong>read only</strong>: Claude can look at data but cannot change it.
+                    It is off until you switch it on, and you can switch it off at any time.
+                    This is a beta feature, so expect rough edges and read the questions
+                    and answers at the bottom of this section before using it with real data.
                 </p>
                 <div id="bridgeCard" class="tacta-opt-bridge">
                     <p class="tacta-opt-bridge-loading">Loading bridge status…</p>
@@ -242,6 +252,13 @@
                         <span class="tacta-opt-about-label">Target</span>
                         <span class="tacta-opt-about-value">NetSuite (*.netsuite.com)</span>
                     </div>
+                    <div class="tacta-opt-about-row">
+                        <span class="tacta-opt-about-label">Feedback</span>
+                        <span class="tacta-opt-about-value">
+                            <button type="button" class="tacta-opt-btn tacta-opt-btn-secondary" data-tacta-feedback="bug">Report a problem</button>
+                            <button type="button" class="tacta-opt-btn tacta-opt-btn-secondary" data-tacta-feedback="idea">Suggest an idea</button>
+                        </span>
+                    </div>
                 </div>
             </section>
         </main>
@@ -258,6 +275,7 @@
 
     <script src="../shared/theme-manager.js"></script>
     <script src="../shared/author-links.js"></script>
+    <script src="../shared/feedback.js"></script>
     <script src="../shared/bridge-settings-ui.js"></script>
     <script src="options.js"></script>
 </body>

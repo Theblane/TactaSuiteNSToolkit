@@ -21,7 +21,9 @@
   var PAGE_FEATURES = [
     {
       test: /\/app\/common\/search\/search\.nl/i,
-      features: ['field-finder', 'quick-search-creation', 'saved-search-export', 'suitescript-exporter']
+      // saved-search-export is NOT listed here: search.nl is the search
+      // editor, and the export toolbar belongs on searchresults.nl only.
+      features: ['field-finder', 'quick-search-creation', 'suitescript-exporter']
     },
     {
       test: /\/app\//i,
@@ -190,8 +192,27 @@
     var context = await loadContext();
     if (context.meetingMode) return;
 
+    // Honour the registry's pageTypes exactly like router.js does. The URL
+    // patterns above are deliberately broad (search.nl covers both the editor
+    // and some list views), so without this a feature restricted to
+    // search-results could land on the search editor. That is how Saved
+    // Search Export ended up injecting its toolbar inside the Criteria /
+    // Results machine on the Saved Search edit page and tripping NetSuite's
+    // "Field not found" alert on every Results subtab click.
+    var pageType = null;
+    if (window.TactaPageDetector) {
+      try {
+        var info = window.__tactaPageInfo || window.TactaPageDetector.detect();
+        pageType = info && info.type;
+      } catch (_) { pageType = null; }
+    }
+
     var toInject = context.features.filter(function (feature) {
-      return eligible.has(feature.id) && isFeatureEnabled(feature, context.featureStates);
+      if (!eligible.has(feature.id) || !isFeatureEnabled(feature, context.featureStates)) return false;
+      if (pageType && Array.isArray(feature.pageTypes) && feature.pageTypes.length) {
+        return feature.pageTypes.indexOf(pageType) !== -1;
+      }
+      return true;
     });
 
     var results = await Promise.allSettled(toInject.map(function (feature) {

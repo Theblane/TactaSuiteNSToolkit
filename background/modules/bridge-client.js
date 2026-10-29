@@ -31,7 +31,16 @@ const DEFAULT_PORT = 8787;
 const RECONNECT_MIN_MS = 2000;
 const RECONNECT_MAX_MS = 30000;
 
-const DEFAULT_SETTINGS = { enabled: false, token: '', port: DEFAULT_PORT, allowWrites: false };
+// sandboxOnly: when true the bridge ignores production tabs and only acts on
+// sandbox / release-preview tabs (hostname contains "-sb<n>." or "sandbox").
+const DEFAULT_SETTINGS = { enabled: false, token: '', port: DEFAULT_PORT, allowWrites: false, sandboxOnly: false };
+
+const SANDBOX_HOST_RE = /^https:\/\/[^/]*(-sb\d+\.|sandbox|-rp\.)/i;
+
+/** True when a NetSuite tab URL is a sandbox or release-preview account. */
+export function isSandboxUrl(url) {
+  return SANDBOX_HOST_RE.test(String(url || ''));
+}
 
 // In-memory connection state (per service-worker lifetime).
 let ws = null;
@@ -190,12 +199,28 @@ function safeSend(socket, obj) {
 const READONLY_PREFIX = /^\s*(select|with)\b/i;
 const FORBIDDEN = /\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke)\b/i;
 
-async function requireTab() {
-  const tab = await deps.findNetSuiteTab();
-  if (!tab) {
+/** Tabs the bridge may act on, honouring the Sandbox-only setting. */
+async function allowedTabs(settings) {
+  const tabs = await deps.listNetSuiteTabs();
+  return settings && settings.sandboxOnly ? tabs.filter((t) => isSandboxUrl(t.url)) : tabs;
+}
+
+/** The tab to act on: the one being viewed, else the most recently used. */
+async function requireTab(settings) {
+  const tabs = await allowedTabs(settings);
+  if (!tabs.length) {
+    if (settings && settings.sandboxOnly) {
+      throw new Error('No open NetSuite sandbox tab found. The bridge is set to Sandbox only; open a sandbox tab or change the setting in the extension.');
+    }
     throw new Error('No open NetSuite tab found. Open your NetSuite instance in a browser tab and try again.');
   }
-  return tab;
+  const active = tabs.find((t) => t.active);
+  if (active) return active;
+  // listNetSuiteTabs does not expose lastAccessed; fall back to the service
+  // worker's own pick when it is allowed, else the first allowed tab.
+  const preferred = await deps.findNetSuiteTab();
+  if (preferred && tabs.some((t) => t.id === preferred.id)) return preferred;
+  return tabs[0];
 }
 
 async function dispatchTool(tool, args, settings) {
@@ -211,24 +236,24 @@ async function dispatchTool(tool, args, settings) {
           throw new Error('Read-only bridge: only SELECT / WITH SuiteQL queries are allowed.');
         }
       }
-      const tab = await requireTab();
+      const tab = await requireTab(settings);
       return deps.executeSuiteQL(tab.id, query, Array.isArray(args.params) ? args.params : null);
     }
 
     case 'netsuite_get_current_page': {
-      const tab = await requireTab();
+      const tab = await requireTab(settings);
       const info = await deps.getPageInfo(tab.id);
       return { tabUrl: tab.url, tabTitle: tab.title, page: info };
     }
 
     case 'netsuite_get_current_record_fields': {
-      const tab = await requireTab();
+      const tab = await requireTab(settings);
       return deps.getRecordFields(tab.id);
     }
 
     case 'netsuite_list_tabs': {
-      const tabs = await deps.listNetSuiteTabs();
-      return { tabs };
+      const tabs = await allowedTabs(settings);
+      return { tabs, sandboxOnly: !!settings.sandboxOnly };
     }
 
     default:
